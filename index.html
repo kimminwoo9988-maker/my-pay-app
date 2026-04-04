@@ -16,72 +16,73 @@
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Pretendard', sans-serif; }
         body { margin: 0; background: #0f111a; color: #e8e8ed; overscroll-behavior-y: none; }
-        
-        /* 스크롤바 숨기기 */
         ::-webkit-scrollbar { display: none; }
 
-        /* 애니메이션 */
+        /* 애니메이션 효과 */
         @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes popIn { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        
-        .animate-slide { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-        .animate-fade { animation: fadeIn 0.2s ease; }
-        .animate-pop { animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-slide { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-fade { animation: fadeIn 0.2s ease forwards; }
+        .animate-pop { animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-        /* UI 요소 스타일링 */
-        .card { background: rgba(36, 40, 59, 0.4); border-radius: 24px; border: 1px solid rgba(255,255,255,0.05); padding: 20px; margin-bottom: 16px; }
+        /* UI 레이아웃 */
+        .app-container { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; padding: 20px 20px 140px; }
+        .card { background: rgba(36, 40, 59, 0.4); border-radius: 24px; border: 1px solid rgba(255,255,255,0.05); padding: 20px; margin-bottom: 16px; backdrop-filter: blur(10px); }
         .btn-fab { width: 62px; height: 62px; border-radius: 31px; background: linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%); color: #0f111a; border: none; display: flex; align-items: center; justify-content: center; position: fixed; bottom: 45px; left: 50%; transform: translateX(-50%); z-index: 100; box-shadow: 0 12px 28px rgba(122, 162, 247, 0.4); cursor: pointer; }
         
         input, select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; color: #fff; padding: 16px; font-size: 16px; width: 100%; margin-bottom: 12px; outline: none; }
-        
         .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .bottom-nav { position: fixed; bottom: 30px; left: 20px; right: 20px; height: 70px; background: rgba(26, 27, 38, 0.8); backdrop-filter: blur(20px); border-radius: 35px; border: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-around; align-items: center; z-index: 90; }
+        .bottom-nav { position: fixed; bottom: 30px; left: 20px; right: 20px; height: 70px; background: rgba(26, 27, 38, 0.85); backdrop-filter: blur(20px); border-radius: 35px; border: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-around; align-items: center; z-index: 90; }
         
-        /* 워터마크 제거 */
-        #csb-bottom-banner, [class*="csb-"] { display: none !important; visibility: hidden !important; }
+        /* 영수증 스타일 */
+        .receipt-area { background: #fff; color: #111; padding: 30px; border-radius: 16px; text-align: center; width: 100%; }
+
+        /* 워터마크 강제 제거 */
+        #csb-bottom-banner, [class*="csb-"] { display: none !important; visibility: hidden !important; opacity: 0 !important; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
-        const KEY = "freelance-pro-v1";
+        const { useState, useEffect, useMemo, useRef } = React;
+        const KEY = "freelance-pro-v2";
 
-        // --- 유틸리티 함수 ---
+        // 유틸리티
         const won = (n) => (n || 0).toLocaleString() + "원";
         const today = () => new Date().toISOString().split('T')[0];
 
         function App() {
             const [entries, setEntries] = useState([]);
-            const [clients, setClients] = useState(["기본업체"]);
+            const [clients, setClients] = useState(["공연장A", "페스티벌B", "홍성군청"]);
             const [pin, setPin] = useState(null);
             const [isUnlocked, setIsUnlocked] = useState(false);
-            const [tab, setTab] = useState("home");
             const [showAdd, setShowAdd] = useState(false);
+            const [showReceipt, setShowReceipt] = useState(null);
             const [isLoaded, setIsLoaded] = useState(false);
 
-            // 데이터 로드
+            // 초기 로드
             useEffect(() => {
                 const saved = localStorage.getItem(KEY);
                 if (saved) {
                     const parsed = JSON.parse(saved);
                     setEntries(parsed.entries || []);
-                    setClients(parsed.clients || ["기본업체"]);
+                    setClients(parsed.clients || ["공연장A", "페스티벌B", "홍성군청"]);
                     setPin(parsed.pin || null);
                 }
                 setIsLoaded(true);
             }, []);
 
-            // 데이터 저장
+            // 저장
             useEffect(() => {
                 if (isLoaded) {
                     localStorage.setItem(KEY, JSON.stringify({ entries, clients, pin }));
                 }
             }, [entries, clients, pin, isLoaded]);
 
-            const totalAmount = useMemo(() => entries.reduce((sum, e) => sum + e.amount, 0), [entries]);
+            // 통계 계산
+            const totalPending = useMemo(() => entries.filter(e => !e.paid).reduce((s, e) => s + e.amount, 0), [entries]);
 
             const handleAdd = (e) => {
                 e.preventDefault();
@@ -98,91 +99,137 @@
                 setShowAdd(false);
             };
 
-            // 잠금 화면 로직
+            const captureReceipt = async () => {
+                const area = document.getElementById("receipt-capture");
+                const canvas = await html2canvas(area, { scale: 3 });
+                const link = document.createElement("a");
+                link.download = `정산서_${showReceipt}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            };
+
+            // 잠금 화면
             if (isLoaded && pin && !isUnlocked) {
                 return (
-                    <div className="overlay" style={{background: '#0f111a'}}>
+                    <div className="overlay animate-fade" style={{background: '#0f111a'}}>
                         <div style={{textAlign: 'center'}}>
-                            <h2 style={{marginBottom: '40px'}}>비밀번호 입력</h2>
-                            <input type="password" inputMode="numeric" onChange={(e) => {
+                            <div style={{fontSize: '50px', marginBottom: '20px'}}>🔒</div>
+                            <h2 style={{fontWeight: 900, marginBottom: '40px'}}>비밀번호 입력</h2>
+                            <input type="password" inputMode="numeric" maxLength="4" onChange={(e) => {
                                 if(e.target.value === pin) setIsUnlocked(true);
-                            }} style={{textAlign: 'center', fontSize: '24px', letterSpacing: '10px'}} autoFocus />
+                            }} style={{textAlign: 'center', fontSize: '32px', letterSpacing: '15px', background: 'rgba(255,255,255,0.1)', width: '200px'}} autoFocus />
                         </div>
                     </div>
                 );
             }
 
             return (
-                <div style={{padding: '20px 20px 150px'}}>
-                    <header style={{marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                        <h1 style={{fontSize: '24px', fontWeight: 900}}>정산 대시보드</h1>
-                        <button onClick={() => {
-                            const p = prompt("새 비밀번호 4자리를 입력하세요 (비우면 해제)");
-                            setPin(p || null);
-                        }} style={{background: 'none', border: 'none', color: '#565f89'}}>🔒</button>
+                <div className="app-container animate-fade">
+                    <header style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px'}}>
+                        <h1 style={{fontSize: '24px', fontWeight: 900}}>나의 정산 관리</h1>
+                        <div style={{display: 'flex', gap: '15px'}}>
+                            <span onClick={() => {
+                                const p = prompt("설정할 비밀번호 4자리를 입력하세요 (해제는 비우고 확인)");
+                                setPin(p || null);
+                            }}>⚙️</span>
+                        </div>
                     </header>
 
-                    <div style={{background: 'linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%)', padding: '24px', borderRadius: '24px', color: '#0f111a', marginBottom: '30px'}}>
-                        <div style={{fontSize: '14px', fontWeight: 800, opacity: 0.8}}>총 정산 예정 금액</div>
-                        <div style={{fontSize: '32px', fontWeight: 900, marginTop: '8px'}}>{won(totalAmount)}</div>
+                    {/* 요약 박스 */}
+                    <div style={{background: 'linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%)', padding: '26px', borderRadius: '28px', color: '#0f111a', marginBottom: '32px', boxShadow: '0 10px 30px rgba(122,162,247,0.3)'}}>
+                        <div style={{fontSize: '14px', fontWeight: 800, opacity: 0.8}}>미수금 합계</div>
+                        <div style={{fontSize: '34px', fontWeight: 900, marginTop: '10px'}}>{won(totalPending)}</div>
                     </div>
 
-                    <div className="tab-content">
+                    {/* 리스트 내역 */}
+                    <div className="list-area">
                         {entries.length === 0 ? (
-                            <div style={{textAlign: 'center', color: '#565f89', marginTop: '100px'}}>내역이 없습니다.</div>
+                            <div style={{textAlign: 'center', marginTop: '100px', color: '#565f89'}}>작업 내역이 없습니다.</div>
                         ) : (
                             entries.map(e => (
-                                <div key={e.id} className="card animate-pop" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                                    <div>
-                                        <div style={{fontWeight: 800, fontSize: '17px', marginBottom: '4px'}}>{e.client}</div>
+                                <div key={e.id} className="card animate-pop" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderLeft: e.paid ? '5px solid #9ece6a' : '5px solid #f7768e'}}>
+                                    <div onClick={() => setShowReceipt(e.client)}>
+                                        <div style={{fontWeight: 800, fontSize: '17px', marginBottom: '5px'}}>{e.client}</div>
                                         <div style={{fontSize: '13px', color: '#565f89'}}>{e.date} · {e.desc}</div>
                                     </div>
                                     <div style={{textAlign: 'right'}}>
-                                        <div style={{fontWeight: 900, fontSize: '18px', color: '#7aa2f7'}}>{won(e.amount)}</div>
-                                        <button onClick={() => setEntries(entries.filter(i => i.id !== e.id))} style={{border: 'none', background: 'none', color: '#f7768e', fontSize: '12px', marginTop: '8px'}}>삭제</button>
+                                        <div style={{fontWeight: 900, fontSize: '18px', color: e.paid ? '#9ece6a' : '#7aa2f7'}}>{won(e.amount)}</div>
+                                        <div style={{marginTop: '8px', display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                                            <span onClick={() => setEntries(entries.map(i => i.id === e.id ? {...i, paid: !i.paid} : i))} style={{fontSize: '12px', color: e.paid ? '#9ece6a' : '#565f89'}}>{e.paid ? "● 입금완료" : "○ 미입금"}</span>
+                                            <span onClick={() => { if(confirm("삭제할까요?")) setEntries(entries.filter(i => i.id !== e.id)) }} style={{fontSize: '12px', color: '#f7768e'}}>삭제</span>
+                                        </div>
                                     </div>
                                 </div>
                             ))
                         )}
                     </div>
 
+                    {/* 메인 버튼 */}
                     <button className="btn-fab" onClick={() => setShowAdd(true)}>
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     </button>
 
+                    {/* 추가 시트 */}
                     {showAdd && (
                         <div className="overlay animate-fade" onClick={() => setShowAdd(false)}>
-                            <div className="card animate-slide" style={{width: '100%', background: '#1a1b26', padding: '30px'}} onClick={e => e.stopPropagation()}>
-                                <h2 style={{marginTop: 0, marginBottom: '24px'}}>새 작업 기록</h2>
+                            <div className="card animate-slide" style={{width: '100%', position: 'absolute', bottom: 0, marginBottom: 0, borderRadius: '30px 30px 0 0', background: '#1a1b26', padding: '30px'}} onClick={e => e.stopPropagation()}>
+                                <div style={{width: '50px', height: '5px', background: '#333', borderRadius: '5px', margin: '0 auto 25px'}}></div>
+                                <h2 style={{marginTop: 0, marginBottom: '25px', fontWeight: 900}}>새 작업 기록</h2>
                                 <form onSubmit={handleAdd}>
                                     <input name="date" type="date" defaultValue={today()} />
                                     <select name="client">
                                         {clients.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
-                                    <input name="amount" type="number" placeholder="금액" inputMode="numeric" required />
-                                    <input name="desc" placeholder="작업 내용" />
-                                    <button type="submit" style={{width: '100%', padding: '18px', background: '#7aa2f7', border: 'none', borderRadius: '14px', color: '#0f111a', fontWeight: 900, fontSize: '17px', marginTop: '10px'}}>저장하기</button>
+                                    <input name="amount" type="number" placeholder="금액 입력" inputMode="numeric" required />
+                                    <input name="desc" placeholder="작업 상세 (예: 무대 조명 설치)" />
+                                    <button type="submit" style={{width: '100%', padding: '20px', background: '#7aa2f7', border: 'none', borderRadius: '18px', color: '#0f111a', fontWeight: 900, fontSize: '18px', marginTop: '10px'}}>기록 저장</button>
                                 </form>
                                 <button onClick={() => {
-                                    const n = prompt("새 업체 이름을 입력하세요");
+                                    const n = prompt("새로운 업체명을 입력하세요");
                                     if(n) setClients([...clients, n]);
-                                }} style={{width: '100%', marginTop: '15px', background: 'none', border: '1px dashed #565f89', color: '#565f89', padding: '10px', borderRadius: '10px'}}>+ 업체 추가</button>
+                                }} style={{width: '100%', marginTop: '15px', background: 'none', border: '1px dashed #565f89', color: '#565f89', padding: '12px', borderRadius: '14px'}}>+ 신규 업체 등록</button>
                             </div>
                         </div>
                     )}
 
-                    <div className="bottom-nav">
-                        <div style={{color: '#7aa2f7', textAlign: 'center'}} onClick={() => setTab("home")}>
-                            <div style={{fontSize: '20px'}}>📊</div>
-                            <div style={{fontSize: '10px', fontWeight: 800}}>현황</div>
+                    {/* 정산서 팝업 */}
+                    {showReceipt && (
+                        <div className="overlay animate-fade" onClick={() => setShowReceipt(null)}>
+                            <div className="animate-pop" style={{width: '100%', maxWidth: '350px'}} onClick={e => e.stopPropagation()}>
+                                <div id="receipt-capture" className="receipt-area">
+                                    <div style={{fontSize: '12px', color: '#888', letterSpacing: '3px', marginBottom: '10px'}}>INVOICE</div>
+                                    <h2 style={{margin: '0 0 20px 0'}}>{showReceipt}</h2>
+                                    <div style={{borderTop: '1px dashed #ccc', borderBottom: '1px dashed #ccc', padding: '20px 0', margin: '20px 0'}}>
+                                        {entries.filter(e => e.client === showReceipt).map(e => (
+                                            <div key={e.id} style={{display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '10px'}}>
+                                                <span>{e.date}</span>
+                                                <span style={{fontWeight: 700}}>{won(e.amount)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                        <span style={{fontWeight: 800}}>총 합계</span>
+                                        <span style={{fontSize: '22px', fontWeight: 900, color: '#2980b9'}}>{won(entries.filter(e => e.client === showReceipt).reduce((s,e)=>s+e.amount,0))}</span>
+                                    </div>
+                                </div>
+                                <button onClick={captureReceipt} style={{width: '100%', padding: '16px', background: '#7aa2f7', border: 'none', borderRadius: '14px', color: '#0f111a', fontWeight: 900, marginTop: '15px'}}>이미지로 저장하기</button>
+                            </div>
                         </div>
-                        <div style={{color: '#565f89', textAlign: 'center'}} onClick={() => {
-                            const txt = entries.map(e => `[${e.date}] ${e.client}: ${won(e.amount)}`).join('\n');
-                            navigator.clipboard.writeText(txt);
-                            alert("전체 내역이 복사되었습니다!");
+                    )}
+
+                    {/* 하단 바 */}
+                    <div className="bottom-nav">
+                        <div style={{textAlign: 'center', color: '#7aa2f7'}}>
+                            <div style={{fontSize: '22px'}}>🏠</div>
+                            <div style={{fontSize: '10px', fontWeight: 800, marginTop: '4px'}}>홈</div>
+                        </div>
+                        <div style={{textAlign: 'center', color: '#565f89'}} onClick={() => {
+                            const data = entries.map(e => `[${e.date}] ${e.client}: ${won(e.amount)} (${e.paid ? "입금완료" : "미입금"})`).join('\n');
+                            navigator.clipboard.writeText(data);
+                            alert("전체 내역이 복사되었습니다.");
                         }}>
-                            <div style={{fontSize: '20px'}}>📋</div>
-                            <div style={{fontSize: '10px', fontWeight: 800}}>복사</div>
+                            <div style={{fontSize: '22px'}}>📋</div>
+                            <div style={{fontSize: '10px', fontWeight: 800, marginTop: '4px'}}>전체복사</div>
                         </div>
                     </div>
                 </div>
