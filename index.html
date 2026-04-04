@@ -1,4 +1,38 @@
-import React, { useState, useEffect, useCallback } from "react";
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>프리랜서 정산기</title>
+    
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    
+    <style>
+        /* 추가하셨던 디자인(CSS)이 있다면 이 아래에 넣거나 덮어씌우세요 */
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Pretendard', sans-serif; }
+        body { margin: 0; background: #0f111a; color: #e8e8ed; overscroll-behavior-y: none; }
+        #csb-bottom-banner, [class*="csb-"] { display: none !important; visibility: hidden !important; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // React 기본 도구들
+        const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+        // =========================================================
+        // 👇 이 아래부터 가지고 계신 [원본 App.js 코드]를 전부 붙여넣으세요!
+        // (주의: 코드 맨 위의 import 문들은 지우고 function App() 부터 넣으시면 됩니다.)
+        // =========================================================
+        
+        function App() {
 
 // ─── Constants & Helpers ───
 const MONTHS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
@@ -647,7 +681,7 @@ function DeleteModal({ entry, onConfirm, onCancel }) {
   return (
     <div style={S.overlay}>
       <div className="animate-pop" style={{ background: "#1a1b26", borderRadius: 24, padding: 32, width: "100%", maxWidth: 340, border: "1px solid rgba(255,255,255,0.1)", textAlign: "center" }}>
-        <div style={{ width: 60, height: 60, borderRadius: "50%", background: "rgba(231, 76, 60, 0.1)", color: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto 20px" }}>🗑️</div>
+        <div style={{ width: 60, height: 60, borderRadius: "50%", background: "rgba(231, 76, 60, 0.1)", color: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto 20px" }}>🗑</div>
         <div style={{ fontSize: 20, fontWeight: 900, color: "#fff", marginBottom: 16 }}>기록 삭제</div>
         <div style={{ fontSize: 16, color: "#8a94b5", lineHeight: 1.6, marginBottom: 28, wordBreak: "keep-all" }}>
           <span style={{ color: "#fff", fontWeight: 800 }}>{entry.client}</span>의 <br />
@@ -663,7 +697,7 @@ function DeleteModal({ entry, onConfirm, onCancel }) {
 }
 
 // ─── Main App Component ───
-export default function App() {
+function App() {
   const [data, setData] = useState(() => load());
   
   const [pinState, setPinState] = useState(() => {
@@ -789,3 +823,16 @@ const S = {
   editBtn: { padding: "8px 14px", background: "rgba(255,255,255,0.05)", border: "none", borderRadius: 10, color: "#a9b1d6", fontSize: 14, fontWeight: 800, cursor: "pointer" },
   overlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 },
 };
+
+          
+        }
+
+        // =========================================================
+        // 👆 원본 코드 붙여넣기 끝
+        // =========================================================
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
