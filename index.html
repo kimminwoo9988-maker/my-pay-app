@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>프리랜서 정산기</title>
+    <title>프리랜서 정산기 Pro</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -14,58 +14,86 @@
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Pretendard', sans-serif; }
         body { margin: 0; background: #0f111a; color: #e8e8ed; overscroll-behavior-y: none; }
-        #root { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; padding-bottom: 120px; }
-        .card { background: rgba(36, 40, 59, 0.4); border-radius: 24px; border: 1px solid rgba(255,255,255,0.03); margin-bottom: 16px; padding: 20px; }
-        .btn-fab { width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%); color: #0f111a; border: none; display: flex; alignItems: center; justifyContent: center; position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 100; box-shadow: 0 12px 28px rgba(122, 162, 247, 0.4); }
+        #root { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; padding: 20px 20px 140px; }
+        
+        /* 디자인 요소 */
+        .card { background: rgba(36, 40, 59, 0.6); borderRadius: 24px; border: 1px solid rgba(255,255,255,0.05); padding: 20px; margin-bottom: 16px; backdrop-filter: blur(10px); }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .total-box { background: linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%); padding: 24px; border-radius: 24px; color: #0f111a; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(122, 162, 247, 0.3); }
+        
+        .btn-fab { width: 64px; height: 64px; border-radius: 32px; background: #7aa2f7; color: #0f111a; border: none; position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 100; box-shadow: 0 15px 35px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        
         input, select { width: 100%; padding: 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; color: #fff; font-size: 16px; margin-bottom: 12px; }
-        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
-        /* 코드샌드박스 워터마크 강제 삭제 */
-        #csb-bottom-banner, [class*="csb-"] { display: none !important; visibility: hidden !important; }
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); display: flex; align-items: flex-end; z-index: 200; }
+        .sheet { background: #1a1b26; width: 100%; border-radius: 32px 32px 0 0; padding: 30px 24px 50px; animation: slideUp 0.3s ease-out; }
+        
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .won { color: #7aa2f7; font-weight: 900; }
+        .del-btn { background: rgba(247, 118, 142, 0.1); color: #f7768e; border: none; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; }
     </style>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
         const { useState, useEffect } = React;
-        const KEY = "freelance-tracker-v16";
+        const KEY = "freelance-tracker-v16-final";
 
         function App() {
             const [entries, setEntries] = useState([]);
-            const [isLoaded, setIsLoaded] = useState(false);
             const [showAdd, setShowAdd] = useState(false);
+            const [isLoaded, setIsLoaded] = useState(false);
 
-            // 데이터 불러오기
             useEffect(() => {
                 const saved = localStorage.getItem(KEY);
-                if (saved) setEntries(JSON.parse(saved).entries || []);
+                if (saved) setEntries(JSON.parse(saved));
                 setIsLoaded(true);
             }, []);
 
-            // 데이터 저장하기
             useEffect(() => {
-                if (isLoaded) localStorage.setItem(KEY, JSON.stringify({ entries }));
+                if (isLoaded) localStorage.setItem(KEY, JSON.stringify(entries));
             }, [entries, isLoaded]);
 
-            const addEntry = (client, amount) => {
-                const newEntry = { id: Date.now(), client, amount: parseInt(amount), date: new Date().toISOString() };
-                setEntries([...entries, newEntry]);
+            const total = entries.reduce((acc, cur) => acc + cur.amount, 0);
+
+            const addData = (e) => {
+                e.preventDefault();
+                const client = e.target.client.value;
+                const amount = parseInt(e.target.amount.value);
+                if(!client || !amount) return;
+                setEntries([{ id: Date.now(), client, amount, date: new Date().toISOString() }, ...entries]);
                 setShowAdd(false);
             };
 
+            const removeData = (id) => {
+                if(confirm("기록을 삭제할까요?")) setEntries(entries.filter(e => e.id !== id));
+            };
+
             return (
-                <div style={{padding: '20px'}}>
-                    <h2 style={{fontSize: '24px', fontWeight: 900, marginBottom: '24px'}}>나의 정산 관리</h2>
-                    
+                <div>
+                    <div className="header">
+                        <h1 style={{fontSize: '24px', fontWeight: 900}}>정산 대시보드</h1>
+                        <div style={{color: '#565f89', fontSize: '14px'}}>{new Date().toLocaleDateString()}</div>
+                    </div>
+
+                    <div className="total-box">
+                        <div style={{fontSize: '14px', fontWeight: 800, opacity: 0.8}}>총 정산 예정액</div>
+                        <div style={{fontSize: '32px', fontWeight: 900, marginTop: '8px'}}>{total.toLocaleString()}원</div>
+                    </div>
+
+                    <h3 style={{fontSize: '18px', marginBottom: '16px'}}>최근 내역</h3>
                     {entries.length === 0 ? (
-                        <div style={{textAlign: 'center', color: '#565f89', marginTop: '100px'}}>기록이 없습니다. 첫 작업을 추가해보세요!</div>
+                        <div style={{textAlign: 'center', padding: '60px 0', color: '#565f89'}}>기록이 없습니다.</div>
                     ) : (
                         entries.map(e => (
                             <div key={e.id} className="card" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                                 <div>
-                                    <div style={{fontWeight: 800, fontSize: '17px'}}>{e.client}</div>
+                                    <div style={{fontWeight: 800, fontSize: '17px', marginBottom: '4px'}}>{e.client}</div>
                                     <div style={{fontSize: '13px', color: '#565f89'}}>{new Date(e.date).toLocaleDateString()}</div>
                                 </div>
-                                <div style={{fontWeight: 900, fontSize: '18px', color: '#7aa2f7'}}>{e.amount.toLocaleString()}원</div>
+                                <div style={{textAlign: 'right'}}>
+                                    <div className="won" style={{fontSize: '18px', marginBottom: '8px'}}>{e.amount.toLocaleString()}원</div>
+                                    <button className="del-btn" onClick={() => removeData(e.id)}>삭제</button>
+                                </div>
                             </div>
                         ))
                     )}
@@ -76,17 +104,13 @@
 
                     {showAdd && (
                         <div className="overlay" onClick={() => setShowAdd(false)}>
-                            <div className="card" style={{width: '100%', background: '#1a1b26'}} onClick={e => e.stopPropagation()}>
-                                <h3 style={{marginTop: 0}}>새 작업 추가</h3>
-                                <input id="clientInp" placeholder="업체명" />
-                                <input id="amountInp" type="number" placeholder="금액" />
-                                <button style={{width: '100%', padding: '16px', background: '#7aa2f7', border: 'none', borderRadius: '14px', fontWeight: 900, color: '#0f111a'}}
-                                    onClick={() => {
-                                        const c = document.getElementById('clientInp').value;
-                                        const a = document.getElementById('amountInp').value;
-                                        if(c && a) addEntry(c, a);
-                                    }}>저장하기</button>
-                            </div>
+                            <form className="sheet" onClick={e => e.stopPropagation()} onSubmit={addData}>
+                                <div style={{width: '50px', height: '5px', background: '#333', borderRadius: '5px', margin: '0 auto 24px'}}></div>
+                                <h2 style={{marginTop: 0, marginBottom: '24px'}}>새 작업 기록</h2>
+                                <input name="client" placeholder="어떤 업체인가요?" required autoFocus />
+                                <input name="amount" type="number" placeholder="금액을 입력하세요" required inputMode="numeric" />
+                                <button type="submit" style={{width: '100%', padding: '20px', background: '#7aa2f7', border: 'none', borderRadius: '18px', color: '#0f111a', fontSize: '18px', fontWeight: 900, marginTop: '10px'}}>기록 저장하기</button>
+                            </form>
                         </div>
                     )}
                 </div>
