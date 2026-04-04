@@ -1,38 +1,9 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>프리랜서 정산기</title>
-    
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    
-    <style>
-        /* 추가하셨던 디자인(CSS)이 있다면 이 아래에 넣거나 덮어씌우세요 */
-        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Pretendard', sans-serif; }
-        body { margin: 0; background: #0f111a; color: #e8e8ed; overscroll-behavior-y: none; }
-        #csb-bottom-banner, [class*="csb-"] { display: none !important; visibility: hidden !important; }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
-
-    <script type="text/babel">
-        // React 기본 도구들
-        const { useState, useEffect, useCallback, useMemo, useRef } = React;
-
-        // =========================================================
+import React, { useState, useEffect, useCallback } from "react";
 
 // ─── Constants & Helpers ───
 const MONTHS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
-const KEY = "freelance-tracker-v15"; 
+const KEY = "freelance-tracker-v16"; 
 const COLORS = ["#7aa2f7", "#bb9af7", "#9ece6a", "#e0af68", "#f7768e", "#7dcfff", "#ff9e64", "#73daca"];
 
 const id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -55,32 +26,7 @@ const today = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-// ─── Styles (맨 위로 끌어올려서 S is not defined 에러 완벽 해결!) ───
-const S = {
-  app: { background: "#0f111a", minHeight: "100vh", color: "#e8e8ed", maxWidth: 480, margin: "0 auto", position: "relative" },
-  header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 24px", background: "transparent" },
-  navBtn: { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, color: "#8a94b5", width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "0.2s" },
-  headerCenter: { display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer" },
-  card: { background: "rgba(36, 40, 59, 0.4)", borderRadius: 24, border: "1px solid rgba(255,255,255,0.03)" },
-  calGrid: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6 },
-  calHead: { textAlign: "center", fontSize: 13, fontWeight: 800, padding: "8px 0", color: "#565f89" },
-  calCell: { display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 2px", minHeight: 60 },
-  empty: { textAlign: "center", color: "#565f89", padding: "80px 0", fontSize: 16, fontWeight: 700 },
-  field: { marginBottom: 24 },
-  row: { display: "flex", gap: 12 },
-  select: { flex: 1, padding: "16px 18px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, color: "#fff", fontSize: 16, fontWeight: 700, outline: "none", appearance: "none" },
-  plusBtn: { width: 54, height: 54, borderRadius: 14, fontSize: 28, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", border: "none", fontWeight: 300, transition: "0.2s" },
-  confirmBtn: { padding: "0 20px", background: "#7aa2f7", border: "none", borderRadius: 14, color: "#0f111a", fontSize: 16, fontWeight: 900, cursor: "pointer" },
-  input: { flex: 1, padding: "16px 18px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, color: "#fff", fontSize: 16, fontWeight: 700, outline: "none" },
-  submitBtn: { width: "100%", padding: "20px 0", border: "none", borderRadius: 18, color: "#0f111a", fontSize: 18, fontWeight: 900, cursor: "pointer", marginTop: 10, boxShadow: "0 10px 24px rgba(0,0,0,0.2)", transition: "0.2s" },
-  partialBtn: { background: "rgba(255,255,255,0.03)", border: "2px dashed rgba(255,255,255,0.15)", borderRadius: 14, color: "#a9b1d6", fontSize: 15, fontWeight: 700, padding: "14px", cursor: "pointer", width: "100%", textAlign: "center" },
-  partialInput: { flex: 1, padding: "14px 16px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, color: "#fff", fontSize: 17, fontWeight: 800, textAlign: "right", outline: "none" },
-  delBtn: { width: 36, height: 36, background: "rgba(231, 76, 60, 0.1)", border: "none", borderRadius: 10, color: "#e74c3c", fontSize: 15, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" },
-  editBtn: { padding: "8px 14px", background: "rgba(255,255,255,0.05)", border: "none", borderRadius: 10, color: "#a9b1d6", fontSize: 14, fontWeight: 800, cursor: "pointer" },
-  overlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 },
-};
-
-// ─── Global Styles ───
+// ─── Global Styles & Sandbox Watermark Hider ───
 const GlobalStyle = () => (
   <style>{`
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -95,9 +41,16 @@ const GlobalStyle = () => (
     .animate-shake { animation: shake 0.4s ease-in-out; }
     
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Pretendard', sans-serif; }
-    body { margin: 0; background: #0f111a; overscroll-behavior-y: none; }
+    body { margin: 0; background: #0f111a; overscroll-behavior-y: none; color: #fff; }
     ::-webkit-scrollbar { display: none; }
     input, select, button { outline: none; font-family: inherit; }
+
+    /* CodeSandbox 워터마크 강제 숨김 처리 */
+    #csb-bottom-banner, div[class*="csb-"], div[id*="csb-"] { 
+      display: none !important; 
+      opacity: 0 !important; 
+      pointer-events: none !important; 
+    }
   `}</style>
 );
 
@@ -152,10 +105,7 @@ function LockScreen({ mode, savedPin, onSuccess, onCancel }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
 
-  useEffect(() => {
-    setPin("");
-    setError(false);
-  }, [mode]);
+  useEffect(() => { setPin(""); setError(false); }, [mode]);
 
   const getTitle = () => {
     if (mode === "setup") return "환영합니다!\n사용할 비밀번호를 설정해주세요";
@@ -172,15 +122,10 @@ function LockScreen({ mode, savedPin, onSuccess, onCancel }) {
 
     if (newPin.length === 4) {
       setTimeout(() => {
-        if (mode === "setup" || mode === "change_new") {
-          onSuccess(newPin);
-        } else if (mode === "verify" || mode === "change_old") {
-          if (newPin === savedPin) {
-            onSuccess(newPin);
-          } else {
-            setError(true);
-            setPin("");
-          }
+        if (mode === "setup" || mode === "change_new") { onSuccess(newPin); } 
+        else if (mode === "verify" || mode === "change_old") {
+          if (newPin === savedPin) { onSuccess(newPin); } 
+          else { setError(true); setPin(""); }
         }
       }, 150);
     }
@@ -192,7 +137,7 @@ function LockScreen({ mode, savedPin, onSuccess, onCancel }) {
     <div style={{ position: "fixed", inset: 0, background: "#0f111a", display: "flex", flexDirection: "column", zIndex: 9999 }} className="animate-fade">
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
         {onCancel && (
-          <button onClick={onCancel} style={{ position: "absolute", top: 24, right: 24, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", color: "#a9b1d6", padding: "8px 16px", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "0.2s" }} onPointerDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")} onPointerUp={(e) => (e.currentTarget.style.transform = "scale(1)")}>
+          <button onClick={onCancel} style={{ position: "absolute", top: 24, right: 24, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", color: "#a9b1d6", padding: "8px 16px", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "0.2s" }}>
             취소
           </button>
         )}
@@ -200,23 +145,19 @@ function LockScreen({ mode, savedPin, onSuccess, onCancel }) {
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0f111a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         </div>
         <div style={{ fontSize: 20, fontWeight: 800, color: "#fff", textAlign: "center", whiteSpace: "pre-wrap", lineHeight: 1.4, marginBottom: 40 }}>{getTitle()}</div>
-        
         <div className={error ? "animate-shake" : ""} style={{ display: "flex", gap: 20 }}>
           {[0, 1, 2, 3].map((i) => (
             <div key={i} style={{ width: 18, height: 18, borderRadius: "50%", background: i < pin.length ? "#7aa2f7" : "rgba(255,255,255,0.1)", transition: "background 0.2s", boxShadow: i < pin.length ? "0 0 12px rgba(122, 162, 247, 0.6)" : "none" }} />
           ))}
         </div>
-        <div style={{ height: 20, marginTop: 16 }}>
-          {error && <span style={{ color: "#f7768e", fontSize: 14, fontWeight: 600 }}>비밀번호가 일치하지 않습니다.</span>}
-        </div>
+        <div style={{ height: 20, marginTop: 16 }}>{error && <span style={{ color: "#f7768e", fontSize: 14, fontWeight: 600 }}>비밀번호가 일치하지 않습니다.</span>}</div>
       </div>
-
       <div style={{ padding: "0 24px 60px", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px 24px" }}>
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-          <button key={num} onClick={() => handlePress(num.toString())} style={{ height: 72, background: "none", border: "none", color: "#fff", fontSize: 32, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", transition: "0.2s" }} onPointerDown={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")} onPointerUp={(e) => (e.currentTarget.style.background = "none")}>{num}</button>
+          <button key={num} onClick={() => handlePress(num.toString())} style={{ height: 72, background: "none", border: "none", color: "#fff", fontSize: 32, fontWeight: 600, cursor: "pointer", borderRadius: "50%", transition: "0.2s" }} onPointerDown={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")} onPointerUp={(e) => (e.currentTarget.style.background = "none")}>{num}</button>
         ))}
         <div /> 
-        <button onClick={() => handlePress("0")} style={{ height: 72, background: "none", border: "none", color: "#fff", fontSize: 32, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", transition: "0.2s" }} onPointerDown={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")} onPointerUp={(e) => (e.currentTarget.style.background = "none")}>0</button>
+        <button onClick={() => handlePress("0")} style={{ height: 72, background: "none", border: "none", color: "#fff", fontSize: 32, fontWeight: 600, cursor: "pointer", borderRadius: "50%", transition: "0.2s" }} onPointerDown={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")} onPointerUp={(e) => (e.currentTarget.style.background = "none")}>0</button>
         <button onClick={handleDelete} style={{ height: 72, background: "none", border: "none", color: "#8a94b5", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", transition: "0.2s" }} onPointerDown={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")} onPointerUp={(e) => (e.currentTarget.style.background = "none")}>
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
         </button>
@@ -241,9 +182,7 @@ function QuickBtns({ val, setVal }) {
 function Header({ year, month, onPrev, onNext, onToday, onChangePin }) {
   return (
     <div style={{ ...S.header, zIndex: 10 }}>
-      <button onClick={onPrev} style={S.navBtn}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-      </button>
+      <button onClick={onPrev} style={S.navBtn}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg></button>
       <div style={S.headerCenter} onClick={onToday}>
         <span style={{ fontSize: 13, color: "#7a84a6", fontWeight: 700, letterSpacing: 1, marginBottom: 2 }}>{year}년</span>
         <span style={{ fontSize: 24, fontWeight: 800, color: "#e0e2eb", letterSpacing: 1 }}>{MONTHS[month]}</span>
@@ -252,9 +191,7 @@ function Header({ year, month, onPrev, onNext, onToday, onChangePin }) {
         <button onClick={onChangePin} style={{...S.navBtn, width: 44, height: 44, background: "rgba(122, 162, 247, 0.1)", border: "1px solid rgba(122, 162, 247, 0.2)", color: "#7aa2f7"}}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         </button>
-        <button onClick={onNext} style={S.navBtn}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
-        </button>
+        <button onClick={onNext} style={S.navBtn}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg></button>
       </div>
     </div>
   );
@@ -275,16 +212,9 @@ function TotalDashboard({ current }) {
 function Calendar({ year, month, entries, selectedDay, onSelect }) {
   const firstDay = new Date(year, month, 1).getDay();
   const totalDays = new Date(year, month + 1, 0).getDate();
-  const now = new Date();
-  const isNow = now.getFullYear() === year && now.getMonth() === month;
-  const todayDate = now.getDate();
+  const now = new Date(); const isNow = now.getFullYear() === year && now.getMonth() === month; const todayDate = now.getDate();
 
-  const totals = entries.reduce((acc, e) => {
-    const d = new Date(e.date).getDate();
-    acc[d] = (acc[d] || 0) + amt(e);
-    return acc;
-  }, {});
-
+  const totals = entries.reduce((acc, e) => { const d = new Date(e.date).getDate(); acc[d] = (acc[d] || 0) + amt(e); return acc; }, {});
   const maxAmt = Math.max(0, ...Object.values(totals).map(Math.abs));
   const cells = [];
 
@@ -292,13 +222,8 @@ function Calendar({ year, month, entries, selectedDay, onSelect }) {
   for (let i = 0; i < firstDay; i++) { cells.push(<div key={`e${i}`} style={S.calCell} />); }
 
   for (let d = 1; d <= totalDays; d++) {
-    const hasData = totals[d] !== undefined;
-    const isSelected = selectedDay === d;
-    const isToday = isNow && todayDate === d;
-    const dow = (firstDay + d - 1) % 7;
-
-    let bgOpacity = 0;
-    if (hasData && maxAmt > 0) bgOpacity = Math.min(1, Math.abs(totals[d]) / maxAmt) * 0.35;
+    const hasData = totals[d] !== undefined; const isSelected = selectedDay === d; const isToday = isNow && todayDate === d; const dow = (firstDay + d - 1) % 7;
+    let bgOpacity = 0; if (hasData && maxAmt > 0) bgOpacity = Math.min(1, Math.abs(totals[d]) / maxAmt) * 0.35;
 
     cells.push(
       <div key={d} onClick={() => hasData && onSelect(isSelected ? null : d)} style={{ ...S.calCell, border: isSelected ? "1px solid rgba(122, 162, 247, 0.5)" : "1px solid transparent", background: hasData ? `rgba(${totals[d] < 0 ? "247,118,142" : "122,162,247"}, ${bgOpacity})` : "transparent", cursor: hasData ? "pointer" : "default", borderRadius: 14, transition: "all 0.3s" }}>
@@ -307,7 +232,6 @@ function Calendar({ year, month, entries, selectedDay, onSelect }) {
       </div>
     );
   }
-
   return <div style={{ ...S.card, padding: "20px 16px", marginBottom: 24 }}><div style={S.calGrid}>{cells}</div></div>;
 }
 
@@ -346,16 +270,8 @@ function ReceiptModal({ client, month, year, items, unpaid, onClose }) {
     try {
       const blob = await generateImageBlob();
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.download = `정산서_${client}_${year}년${month + 1}월.png`;
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      alert("이미지 저장 중 오류가 발생했습니다.");
-    } finally {
-      setIsProcessing(false);
-    }
+      const link = document.createElement("a"); link.download = `정산서_${client}_${year}년${month + 1}월.png`; link.href = url; link.click(); URL.revokeObjectURL(url);
+    } catch (error) { alert("이미지 저장 중 오류가 발생했습니다."); } finally { setIsProcessing(false); }
   };
 
   const shareImage = async () => {
@@ -363,34 +279,21 @@ function ReceiptModal({ client, month, year, items, unpaid, onClose }) {
     try {
       const blob = await generateImageBlob();
       const file = new File([blob], `정산서_${client}_${year}년${month + 1}월.png`, { type: "image/png" });
-      
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: `${client} 정산서`,
-          text: `${year}년 ${month + 1}월 정산 내역입니다.`,
-        });
-      } else {
-        alert("이 브라우저/기기에서는 이미지 다이렉트 공유를 지원하지 않습니다.\n'저장' 버튼을 눌러 사진첩에 저장 후 공유해주세요.");
-      }
-    } catch (error) {
-      if (error.name !== "AbortError") alert("공유 중 오류가 발생했습니다.");
-    } finally {
-      setIsProcessing(false);
-    }
+        await navigator.share({ files: [file], title: `${client} 정산서`, text: `${year}년 ${month + 1}월 정산 내역입니다.`, });
+      } else { alert("이 기기에서는 이미지 다이렉트 공유를 지원하지 않습니다.\n'저장' 버튼을 이용해주세요."); }
+    } catch (error) { if (error.name !== "AbortError") alert("공유 중 오류가 발생했습니다."); } finally { setIsProcessing(false); }
   };
 
   return (
     <div style={S.overlay} onClick={onClose}>
       <div className="animate-pop" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, display: "flex", flexDirection: "column", gap: 16 }}>
-        
         <div id="receipt-capture-area" style={{ background: "#ffffff", borderRadius: 16, padding: "40px 24px", color: "#111", boxShadow: "0 20px 40px rgba(0,0,0,0.5)", position: "relative" }}>
           <div style={{ textAlign: "center", marginBottom: 32 }}>
             <div style={{ fontSize: 13, color: "#888", fontWeight: 800, letterSpacing: 2 }}>INVOICE</div>
             <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8, color: "#111", wordBreak: "keep-all" }}>{client}</div>
             <div style={{ fontSize: 14, color: "#666", marginTop: 8, fontWeight: 600 }}>{year}년 {month + 1}월 정산 내역</div>
           </div>
-
           <div style={{ borderTop: "2px dashed #ddd", borderBottom: "2px dashed #ddd", padding: "24px 0", marginBottom: 24, minHeight: 100 }}>
             {items.map((e) => (
               <div key={e.id} style={{ display: "flex", justifyContent: "space-between", marginBottom: 14, fontSize: 16 }}>
@@ -405,14 +308,12 @@ function ReceiptModal({ client, month, year, items, unpaid, onClose }) {
               </div>
             )}
           </div>
-
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8f9fa", padding: "20px 16px", borderRadius: 12 }}>
             <span style={{ fontSize: 16, fontWeight: 800, color: "#333" }}>총 청구액</span>
             <span style={{ fontSize: 26, fontWeight: 900, color: "#2980b9" }}>{won(finalTotal)}</span>
           </div>
           <div style={{ textAlign: "center", marginTop: 32, fontSize: 12, color: "#aaa", fontWeight: 500 }}>발행일: {todayStr}</div>
         </div>
-
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={saveImage} disabled={isProcessing} style={{ flex: 1, padding: "14px", background: "#7aa2f7", border: "none", borderRadius: 14, color: "#0f111a", fontWeight: 900, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "0.2s" }} onPointerDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")} onPointerUp={(e) => (e.currentTarget.style.transform = "scale(1)")}>
@@ -424,7 +325,6 @@ function ReceiptModal({ client, month, year, items, unpaid, onClose }) {
               카톡 공유
             </button>
           </div>
-          
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={copyText} style={{ flex: 1, padding: "14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 14, color: "#e0e2eb", fontWeight: 800, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "0.2s" }} onPointerDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")} onPointerUp={(e) => (e.currentTarget.style.transform = "scale(1)")}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -453,15 +353,10 @@ function SummaryTab({ entries, unpaidMap, year, month, onDelete, onEditAmount })
     if (!groups[e.client]) groups[e.client] = { total: 0, count: 0, items: [] };
     groups[e.client].total += amt(e); groups[e.client].count++; groups[e.client].items.push(e);
   });
-
   const grandTotal = entries.reduce((s, e) => s + amt(e), 0);
   const allClients = [...new Set([...Object.keys(groups), ...Object.keys(unpaidMap)])];
 
-  const doEdit = (e) => {
-    const r = parseInt(editVal.replace(/,/g, ""), 10);
-    if (!isNaN(r) && r > 0) onEditAmount(e.id, r);
-    setEditId(null);
-  };
+  const doEdit = (e) => { const r = parseInt(editVal.replace(/,/g, ""), 10); if (!isNaN(r) && r > 0) onEditAmount(e.id, r); setEditId(null); };
 
   return (
     <div className="animate-fade">
@@ -490,7 +385,6 @@ function SummaryTab({ entries, unpaidMap, year, month, onDelete, onEditAmount })
         {allClients.map((name, i) => {
           const g = groups[name]; const un = unpaidMap[name] || 0; const total = (g ? g.total : 0) + un;
           if (total <= 0 && !g) return null;
-          
           const c = COLORS[i % 8]; const isOpen = openClient === name; const items = g ? g.items : [];
 
           return (
@@ -520,9 +414,9 @@ function SummaryTab({ entries, unpaidMap, year, month, onDelete, onEditAmount })
                     <div key={e.id} style={{ padding: "14px 0", borderBottom: "1px dashed rgba(255,255,255,0.1)" }}>
                       {editId === e.id ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ fontSize: 15, color: e.discount ? "#f7768e" : "#a9b1d6", flex: 1 }}>{tag(e)}</span>
-                          <input value={editVal} onChange={(ev) => setEditVal(fmt(ev.target.value))} inputMode="numeric" autoFocus onKeyDown={(ev) => { if (ev.key === "Enter") doEdit(e); if (ev.key === "Escape") setEditId(null); }} style={{ width: 110, padding: "10px", background: "rgba(0,0,0,0.4)", border: "1px solid #7aa2f7", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 800, textAlign: "right", outline: "none" }} />
-                          <button onClick={() => doEdit(e)} style={{ padding: "10px 16px", background: "#7aa2f7", border: "none", borderRadius: 10, color: "#0f111a", fontSize: 14, fontWeight: 900 }}>확인</button>
+                          <span style={{ fontSize: 15, color: e.discount ? "#f7768e" : "#a9b1d6", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tag(e)}</span>
+                          <input value={editVal} onChange={(ev) => setEditVal(fmt(ev.target.value))} inputMode="numeric" autoFocus onKeyDown={(ev) => { if (ev.key === "Enter") doEdit(e); if (ev.key === "Escape") setEditId(null); }} style={{ width: 110, padding: "10px", background: "rgba(0,0,0,0.4)", border: "1px solid #7aa2f7", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 800, textAlign: "right", outline: "none", minWidth: 0 }} />
+                          <button onClick={() => doEdit(e)} style={{ padding: "10px 16px", background: "#7aa2f7", border: "none", borderRadius: 10, color: "#0f111a", fontSize: 14, fontWeight: 900, flexShrink: 0 }}>확인</button>
                         </div>
                       ) : (
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -607,16 +501,16 @@ function PayRow({ client, total, thisTotal, unpaid, done, paidAmt, items, onChec
     <div style={{ background: done ? "rgba(26, 27, 38, 0.5)" : "rgba(36, 40, 59, 0.9)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: done ? 0.6 : 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <label style={{ display: "flex", alignItems: "center", gap: 16, cursor: "pointer", flex: 1 }}>
-          <div style={{ width: 34, height: 34, borderRadius: "50%", background: done ? "#9ece6a" : "rgba(0,0,0,0.3)", border: done ? "none" : "2px solid #565f89", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s" }}>
+          <div style={{ width: 34, height: 34, borderRadius: "50%", background: done ? "#9ece6a" : "rgba(0,0,0,0.3)", border: done ? "none" : "2px solid #565f89", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s", flexShrink: 0 }}>
             <input type="checkbox" checked={done} onChange={onCheck} style={{ opacity: 0, position: "absolute", width: 34, height: 34, cursor: "pointer" }} />
             {done && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f111a" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>}
           </div>
-          <div>
-            <span style={{ fontSize: 18, fontWeight: 900, color: done ? "#7a84a6" : "#fff", textDecoration: done ? "line-through" : "none" }}>{client}</span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: done ? "#7a84a6" : "#fff", textDecoration: done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
             {(unpaid > 0 || items.length === 0) && <div style={{ fontSize: 13, color: "#e0af68", marginTop: 4, fontWeight: 700 }}>미정산 이월 포함</div>}
           </div>
         </label>
-        <span style={{ fontSize: 22, fontWeight: 900, color: done ? "#7a84a6" : "#7aa2f7", textDecoration: done ? "line-through" : "none" }}>{won(total)}</span>
+        <span style={{ fontSize: 22, fontWeight: 900, color: done ? "#7a84a6" : "#7aa2f7", textDecoration: done ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{won(total)}</span>
       </div>
 
       {paidAmt > 0 && !done && (
@@ -633,9 +527,9 @@ function PayRow({ client, total, thisTotal, unpaid, done, paidAmt, items, onChec
           ) : (
             <div className="animate-slide">
               <div style={{ display: "flex", gap: 10 }}>
-                <input value={val} onChange={(e) => setVal(fmt(e.target.value))} placeholder="입금된 금액" inputMode="numeric" style={S.partialInput} onKeyDown={(e) => e.key === "Enter" && go()} autoFocus />
-                <button onClick={go} style={{ padding: "0 20px", background: "#7aa2f7", border: "none", borderRadius: 14, color: "#0f111a", fontWeight: 900, fontSize: 16 }}>확인</button>
-                <button onClick={() => { setOpen(false); setVal(""); }} style={{ padding: "0 16px", background: "rgba(0,0,0,0.3)", border: "none", borderRadius: 14, color: "#a9b1d6", fontWeight: 800 }}>취소</button>
+                <input value={val} onChange={(e) => setVal(fmt(e.target.value))} placeholder="입금된 금액" inputMode="numeric" style={{ ...S.partialInput, minWidth: 0 }} onKeyDown={(e) => e.key === "Enter" && go()} autoFocus />
+                <button onClick={go} style={{ padding: "0 20px", background: "#7aa2f7", border: "none", borderRadius: 14, color: "#0f111a", fontWeight: 900, fontSize: 16, flexShrink: 0 }}>확인</button>
+                <button onClick={() => { setOpen(false); setVal(""); }} style={{ padding: "0 16px", background: "rgba(0,0,0,0.3)", border: "none", borderRadius: 14, color: "#a9b1d6", fontWeight: 800, flexShrink: 0 }}>취소</button>
               </div>
               <QuickBtns val={val} setVal={setVal} />
             </div>
@@ -646,60 +540,101 @@ function PayRow({ client, total, thisTotal, unpaid, done, paidAmt, items, onChec
   );
 }
 
-// ─── Bottom Sheet Form ───
+// ─── Swipe-to-Close Bottom Sheet Form ───
 function BottomSheetForm({ clients, onAdd, onNewClient, onClose }) {
   const [client, setClient] = useState(""); const [amount, setAmount] = useState(""); const [desc, setDesc] = useState("");
   const [dateVal, setDateVal] = useState(today()); const [discount, setDiscount] = useState(false);
   const [showNew, setShowNew] = useState(false); const [newName, setNewName] = useState("");
+
+  // Swipe to close 로직
+  const [startY, setStartY] = useState(null);
+  const [dragY, setDragY] = useState(0);
+
+  const onTouchStart = (e) => setStartY(e.touches[0].clientY);
+  const onTouchMove = (e) => {
+    if (startY === null) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - startY;
+    if (diff > 0) setDragY(diff); // 아래로 내릴 때만 움직임 적용
+  };
+  const onTouchEnd = () => {
+    if (dragY > 100) onClose(); // 100px 이상 내리면 닫힘
+    else setDragY(0); // 아니면 제자리 복귀
+    setStartY(null);
+  };
 
   const submit = () => {
     if (!client || !amount) return; const raw = parseInt(amount.replace(/,/g, ""), 10); if (isNaN(raw) || raw <= 0) return;
     const [y, m, d] = dateVal.split("-").map(Number);
     onAdd({ client, amount: raw, desc: discount ? "" : desc.trim(), date: new Date(y, m - 1, d, 12).toISOString(), discount });
   };
-
   const addC = () => { if (!newName.trim()) return; onNewClient(newName.trim()); setClient(newName.trim()); setNewName(""); setShowNew(false); };
 
   return (
     <div style={{ ...S.overlay, alignItems: "flex-end", padding: 0 }} onClick={onClose}>
-      <div className="animate-slide" onClick={(e) => e.stopPropagation()} style={{ background: "#1a1b26", width: "100%", maxWidth: 480, borderTopLeftRadius: 36, borderTopRightRadius: 36, padding: "28px 24px calc(env(safe-area-inset-bottom) + 30px)", boxShadow: "0 -10px 40px rgba(0,0,0,0.6)" }}>
+      <div 
+        className="animate-slide" 
+        onClick={(e) => e.stopPropagation()} 
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        style={{ 
+          background: "#1a1b26", width: "100%", maxWidth: 480, 
+          borderTopLeftRadius: 36, borderTopRightRadius: 36, 
+          padding: "28px 24px calc(env(safe-area-inset-bottom) + 30px)", 
+          boxShadow: "0 -10px 40px rgba(0,0,0,0.6)",
+          transform: dragY > 0 ? `translateY(${dragY}px)` : "translateY(0)",
+          transition: dragY > 0 ? "none" : "transform 0.3s ease-out",
+          display: "flex", flexDirection: "column"
+        }}
+      >
+        {/* 상단 스와이프 핸들바 */}
         <div style={{ width: 56, height: 6, background: "rgba(255,255,255,0.2)", borderRadius: 3, margin: "0 auto 28px" }} />
         <div style={{ fontSize: 22, fontWeight: 900, color: "#fff", marginBottom: 28 }}>새 작업 기록</div>
 
-        <div style={S.field}>
-          <div style={S.row}>
-            <input type="date" value={dateVal} onChange={(e) => setDateVal(e.target.value)} style={{ ...S.input, colorScheme: "dark", flex: 0.8 }} />
-            <select value={client} onChange={(e) => setClient(e.target.value)} style={S.select}>
-              <option value="">업체 선택</option>
-              {clients.map((c) => (<option key={c} value={c}>{c}</option>))}
-            </select>
-            <button onClick={() => setShowNew(!showNew)} style={{ ...S.plusBtn, background: showNew ? "#7aa2f7" : "rgba(255,255,255,0.05)", color: showNew ? "#0f111a" : "#7aa2f7" }}>{showNew ? "✕" : "+"}</button>
+        {/* 첫 번째 줄: 날짜 + 업체명 입력 폼 개선 */}
+        <div style={{ ...S.field, width: "100%", boxSizing: "border-box" }}>
+          <div style={{ display: "flex", gap: 10, width: "100%" }}>
+            <input type="date" value={dateVal} onChange={(e) => setDateVal(e.target.value)} style={{ ...S.input, colorScheme: "dark", flex: 1, minWidth: 0, padding: "14px 12px" }} />
+            
+            {!showNew && (
+              <select value={client} onChange={(e) => setClient(e.target.value)} style={{ ...S.select, flex: 1.5, minWidth: 0, padding: "14px 12px" }}>
+                <option value="">업체 선택</option>
+                {clients.map((c) => (<option key={c} value={c}>{c}</option>))}
+              </select>
+            )}
+            
+            {showNew && (
+              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="새 업체명" style={{ ...S.input, flex: 1.5, minWidth: 0, padding: "14px 12px" }} onKeyDown={(e) => e.key === "Enter" && addC()} autoFocus />
+            )}
+            
+            {/* 추가 & X 버튼 세로쓰기 방지 (nowrap, shrink: 0) */}
+            {showNew ? (
+              <button onClick={addC} style={{ ...S.confirmBtn, flexShrink: 0, whiteSpace: "nowrap", padding: "0 16px" }}>추가</button>
+            ) : (
+              <button onClick={() => setShowNew(true)} style={{ ...S.plusBtn, background: "rgba(255,255,255,0.05)", color: "#7aa2f7", flexShrink: 0, width: 52 }}>+</button>
+            )}
+            {showNew && <button onClick={() => setShowNew(false)} style={{ ...S.plusBtn, background: "rgba(255,255,255,0.05)", color: "#a9b1d6", flexShrink: 0, width: 52 }}>✕</button>}
           </div>
-          {showNew && (
-            <div className="animate-slide" style={{ ...S.row, marginTop: 12 }}>
-              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="새 업체명 입력" style={S.input} onKeyDown={(e) => e.key === "Enter" && addC()} autoFocus />
-              <button onClick={addC} style={S.confirmBtn}>추가</button>
-            </div>
-          )}
         </div>
 
-        <div style={S.field}>
-          <div style={{ ...S.row, alignItems: "center", background: "rgba(0,0,0,0.2)", borderRadius: 18, border: "1px solid rgba(255,255,255,0.05)", padding: "10px 20px" }}>
-            <input value={amount} onChange={(e) => setAmount(fmt(e.target.value))} placeholder="0" inputMode="numeric" style={{ flex: 1, background: "none", border: "none", color: discount ? "#f7768e" : "#7aa2f7", fontSize: 32, fontWeight: 900, textAlign: "right", outline: "none", padding: "16px 0" }} onKeyDown={(e) => e.key === "Enter" && submit()} />
-            <span style={{ fontSize: 22, color: "#8a94b5", fontWeight: 800, marginLeft: 10 }}>원</span>
+        {/* 두 번째 줄: 금액 부분 너비 오버플로우 방지 */}
+        <div style={{ ...S.field, width: "100%", boxSizing: "border-box" }}>
+          <div style={{ display: "flex", alignItems: "center", background: "rgba(0,0,0,0.2)", borderRadius: 18, border: "1px solid rgba(255,255,255,0.05)", padding: "10px 20px", width: "100%", boxSizing: "border-box" }}>
+            <input value={amount} onChange={(e) => setAmount(fmt(e.target.value))} placeholder="0" inputMode="numeric" style={{ flex: 1, background: "none", border: "none", color: discount ? "#f7768e" : "#7aa2f7", fontSize: 32, fontWeight: 900, textAlign: "right", outline: "none", padding: "16px 0", minWidth: 0 }} onKeyDown={(e) => e.key === "Enter" && submit()} />
+            <span style={{ fontSize: 22, color: "#8a94b5", fontWeight: 800, marginLeft: 10, flexShrink: 0 }}>원</span>
           </div>
           <QuickBtns val={amount} setVal={setAmount} />
         </div>
 
-        <div style={{ display: "flex", gap: 14, marginBottom: 28 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", background: discount ? "rgba(247, 118, 142, 0.15)" : "rgba(255,255,255,0.05)", padding: "16px", borderRadius: 14, border: `1px solid ${discount ? "#f7768e" : "transparent"}`, transition: "0.2s" }}>
-            <input type="checkbox" checked={discount} onChange={(e) => setDiscount(e.target.checked)} style={{ accentColor: "#f7768e", width: 22, height: 22 }} />
+        {/* 세 번째 줄: 할인 적용 및 내용 오버플로우 픽스 */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 28, width: "100%", boxSizing: "border-box" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: discount ? "rgba(247, 118, 142, 0.15)" : "rgba(255,255,255,0.05)", padding: "16px", borderRadius: 14, border: `1px solid ${discount ? "#f7768e" : "transparent"}`, transition: "0.2s", flexShrink: 0, whiteSpace: "nowrap" }}>
+            <input type="checkbox" checked={discount} onChange={(e) => setDiscount(e.target.checked)} style={{ accentColor: "#f7768e", width: 22, height: 22, margin: 0 }} />
             <span style={{ fontSize: 16, color: discount ? "#f7768e" : "#a9b1d6", fontWeight: 800 }}>할인 적용</span>
           </label>
-          {!discount && <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="작업 내용 (선택)" style={{ ...S.input, flex: 1 }} onKeyDown={(e) => e.key === "Enter" && submit()} />}
+          {!discount && <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="작업 내용 (선택)" style={{ ...S.input, flex: 1, minWidth: 0 }} onKeyDown={(e) => e.key === "Enter" && submit()} />}
         </div>
 
-        <button onClick={submit} disabled={!client || !amount} style={{ ...S.submitBtn, opacity: client && amount ? 1 : 0.3, background: discount ? "linear-gradient(135deg, #f7768e 0%, #ff9e64 100%)" : "linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%)" }}>
+        <button onClick={submit} disabled={!client || !amount} style={{ ...S.submitBtn, opacity: client && amount ? 1 : 0.3, background: discount ? "linear-gradient(135deg, #f7768e 0%, #ff9e64 100%)" : "linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%)", width: "100%" }}>
           {discount ? "할인 내역 저장" : "기록 저장하기"}
         </button>
       </div>
@@ -829,10 +764,28 @@ export default function App() {
     </div>
   );
 }
-        // =========================================================
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+// ─── Styles ───
+const S = {
+  app: { background: "#0f111a", minHeight: "100vh", color: "#e8e8ed", maxWidth: 480, margin: "0 auto", position: "relative" },
+  header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 24px", background: "transparent" },
+  navBtn: { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, color: "#8a94b5", width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "0.2s" },
+  headerCenter: { display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer" },
+  card: { background: "rgba(36, 40, 59, 0.4)", borderRadius: 24, border: "1px solid rgba(255,255,255,0.03)" },
+  calGrid: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6 },
+  calHead: { textAlign: "center", fontSize: 13, fontWeight: 800, padding: "8px 0", color: "#565f89" },
+  calCell: { display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 2px", minHeight: 60 },
+  empty: { textAlign: "center", color: "#565f89", padding: "80px 0", fontSize: 16, fontWeight: 700 },
+  field: { marginBottom: 24 },
+  row: { display: "flex", gap: 12 },
+  select: { flex: 1, padding: "16px 18px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, color: "#fff", fontSize: 16, fontWeight: 700, outline: "none", appearance: "none" },
+  plusBtn: { width: 54, height: 54, borderRadius: 14, fontSize: 28, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", border: "none", fontWeight: 300, transition: "0.2s" },
+  confirmBtn: { padding: "0 20px", background: "#7aa2f7", border: "none", borderRadius: 14, color: "#0f111a", fontSize: 16, fontWeight: 900, cursor: "pointer" },
+  input: { flex: 1, padding: "16px 18px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, color: "#fff", fontSize: 16, fontWeight: 700, outline: "none" },
+  submitBtn: { width: "100%", padding: "20px 0", border: "none", borderRadius: 18, color: "#0f111a", fontSize: 18, fontWeight: 900, cursor: "pointer", marginTop: 10, boxShadow: "0 10px 24px rgba(0,0,0,0.2)", transition: "0.2s" },
+  partialBtn: { background: "rgba(255,255,255,0.03)", border: "2px dashed rgba(255,255,255,0.15)", borderRadius: 14, color: "#a9b1d6", fontSize: 15, fontWeight: 700, padding: "14px", cursor: "pointer", width: "100%", textAlign: "center" },
+  partialInput: { flex: 1, padding: "14px 16px", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, color: "#fff", fontSize: 17, fontWeight: 800, textAlign: "right", outline: "none" },
+  delBtn: { width: 36, height: 36, background: "rgba(231, 76, 60, 0.1)", border: "none", borderRadius: 10, color: "#e74c3c", fontSize: 15, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" },
+  editBtn: { padding: "8px 14px", background: "rgba(255,255,255,0.05)", border: "none", borderRadius: 10, color: "#a9b1d6", fontSize: 14, fontWeight: 800, cursor: "pointer" },
+  overlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 },
+};
