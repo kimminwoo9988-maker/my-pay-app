@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>프리랜서 정산기</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Pretendard', sans-serif; }
+        body { margin: 0; background: #0f111a; color: #e8e8ed; overscroll-behavior-y: none; }
+        #root { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; padding-bottom: 120px; }
+        .card { background: rgba(36, 40, 59, 0.4); border-radius: 24px; border: 1px solid rgba(255,255,255,0.03); margin-bottom: 16px; padding: 20px; }
+        .btn-fab { width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%); color: #0f111a; border: none; display: flex; alignItems: center; justifyContent: center; position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 100; box-shadow: 0 12px 28px rgba(122, 162, 247, 0.4); }
+        input, select { width: 100%; padding: 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; color: #fff; font-size: 16px; margin-bottom: 12px; }
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
+        /* 코드샌드박스 워터마크 강제 삭제 */
+        #csb-bottom-banner, [class*="csb-"] { display: none !important; visibility: hidden !important; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const KEY = "freelance-tracker-v16";
+
+        function App() {
+            const [entries, setEntries] = useState([]);
+            const [isLoaded, setIsLoaded] = useState(false);
+            const [showAdd, setShowAdd] = useState(false);
+
+            // 데이터 불러오기
+            useEffect(() => {
+                const saved = localStorage.getItem(KEY);
+                if (saved) setEntries(JSON.parse(saved).entries || []);
+                setIsLoaded(true);
+            }, []);
+
+            // 데이터 저장하기
+            useEffect(() => {
+                if (isLoaded) localStorage.setItem(KEY, JSON.stringify({ entries }));
+            }, [entries, isLoaded]);
+
+            const addEntry = (client, amount) => {
+                const newEntry = { id: Date.now(), client, amount: parseInt(amount), date: new Date().toISOString() };
+                setEntries([...entries, newEntry]);
+                setShowAdd(false);
+            };
+
+            return (
+                <div style={{padding: '20px'}}>
+                    <h2 style={{fontSize: '24px', fontWeight: 900, marginBottom: '24px'}}>나의 정산 관리</h2>
+                    
+                    {entries.length === 0 ? (
+                        <div style={{textAlign: 'center', color: '#565f89', marginTop: '100px'}}>기록이 없습니다. 첫 작업을 추가해보세요!</div>
+                    ) : (
+                        entries.map(e => (
+                            <div key={e.id} className="card" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                <div>
+                                    <div style={{fontWeight: 800, fontSize: '17px'}}>{e.client}</div>
+                                    <div style={{fontSize: '13px', color: '#565f89'}}>{new Date(e.date).toLocaleDateString()}</div>
+                                </div>
+                                <div style={{fontWeight: 900, fontSize: '18px', color: '#7aa2f7'}}>{e.amount.toLocaleString()}원</div>
+                            </div>
+                        ))
+                    )}
+
+                    <button className="btn-fab" onClick={() => setShowAdd(true)}>
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+
+                    {showAdd && (
+                        <div className="overlay" onClick={() => setShowAdd(false)}>
+                            <div className="card" style={{width: '100%', background: '#1a1b26'}} onClick={e => e.stopPropagation()}>
+                                <h3 style={{marginTop: 0}}>새 작업 추가</h3>
+                                <input id="clientInp" placeholder="업체명" />
+                                <input id="amountInp" type="number" placeholder="금액" />
+                                <button style={{width: '100%', padding: '16px', background: '#7aa2f7', border: 'none', borderRadius: '14px', fontWeight: 900, color: '#0f111a'}}
+                                    onClick={() => {
+                                        const c = document.getElementById('clientInp').value;
+                                        const a = document.getElementById('amountInp').value;
+                                        if(c && a) addEntry(c, a);
+                                    }}>저장하기</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
