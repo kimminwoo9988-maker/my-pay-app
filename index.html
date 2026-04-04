@@ -11,6 +11,10 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
 <body style="margin: 0; background: #0f111a;">
     <div id="root"></div>
@@ -18,10 +22,28 @@
     <script type="text/babel">
         const { useState, useEffect, useCallback } = React;
      
+        // ─── Firebase 서버 초기화 세팅 ───
+        const firebaseConfig = {
+          apiKey: "AIzaSyCYjTb8SN-Vq7GoF2LPem_4VRQ8fPb8oFw",
+          authDomain: "pp-backup-c0ad2.firebaseapp.com",
+          projectId: "pp-backup-c0ad2",
+          storageBucket: "pp-backup-c0ad2.firebasestorage.app",
+          messagingSenderId: "356643544206",
+          appId: "1:356643544206:web:15a5ef0bbd346415d07ddf",
+          measurementId: "G-2RJY1LV1MX"
+        };
+        
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const provider = new firebase.auth.GoogleAuthProvider();
+
         // ─── Constants & Helpers ───
         const MONTHS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
         const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
-        const KEY = "freelance-tracker-v16"; 
+        const KEY = "freelance-tracker-v16"; // 기존 로컬 데이터 마이그레이션용 키
         const COLORS = ["#7aa2f7", "#bb9af7", "#9ece6a", "#e0af68", "#f7768e", "#7dcfff", "#ff9e64", "#73daca"];
           
         const id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -62,28 +84,8 @@
             body { margin: 0; background: #0f111a; overscroll-behavior-y: none; color: #fff; }
             ::-webkit-scrollbar { display: none; }
             input, select, button { outline: none; font-family: inherit; }
-             
-            /* CodeSandbox 워터마크 강제 숨김 처리 */
-            #csb-bottom-banner, div[class*="csb-"], div[id*="csb-"] { 
-              display: none !important; 
-              opacity: 0 !important; 
-              pointer-events: none !important; 
-            }
           `}</style>
         );
-          
-        // ─── Storage (Sync) ───
-        const load = () => {
-          try {
-            const r = localStorage.getItem(KEY);
-            return r ? JSON.parse(r) : { entries: [], clients: [], payments: {}, pin: null };
-          } catch {
-            return { entries: [], clients: [], payments: {}, pin: null };
-          }
-        };
-        const save = (d) => {
-          try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {}
-        };
           
         // ─── Logic Helpers ───
         const sumPaid = (pay, client, excludeKey) => {
@@ -197,7 +199,7 @@
           );
         }
 
-        // ─── [새 기능] Client Management Modal ───
+        // ─── Client Management Modal ───
         function ClientManagerModal({ clients, onUpdate, onDelete, onClose }) {
           const [editName, setEditName] = useState(null);
           const [newVal, setNewVal] = useState("");
@@ -248,7 +250,10 @@
                 <button onClick={onChangePin} style={{...S.navBtn, width: 44, height: 44, background: "rgba(122, 162, 247, 0.1)", border: "1px solid rgba(122, 162, 247, 0.2)", color: "#7aa2f7"}}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </button>
-                <button onClick={onNext} style={S.navBtn}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg></button>
+                {/* 구글 클라우드 로그아웃 버튼 */}
+                <button onClick={() => auth.signOut()} style={{...S.navBtn, width: 44, height: 44, background: "rgba(247, 118, 142, 0.1)", border: "1px solid rgba(247, 118, 142, 0.2)", color: "#f7768e"}}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
               </div>
             </div>
           );
@@ -259,11 +264,9 @@
             <div style={{ ...S.card, padding: "26px 20px", marginBottom: 24, background: "linear-gradient(145deg, #1f2233 0%, #161824 100%)", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
               <span style={{ fontSize: 14, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>이번 달 총 합계</span>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                {/* 글씨 크기 34px로 안정감 있게 유지 */}
                 <span style={{ fontSize: 34, fontWeight: 900, color: "#fff", letterSpacing: "-1px" }}>{current.toLocaleString("ko-KR")}</span>
                 <span style={{ fontSize: 18, fontWeight: 700, color: "#7aa2f7" }}>원</span>
               </div>
-              {/* 추가된 부분: 미정산 금액 표시 (0원보다 클 때만 나타남) */}
               {unpaid > 0 && (
                 <div style={{ marginTop: 10, padding: "6px 14px", background: "rgba(224, 175, 104, 0.15)", borderRadius: 12, display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 13, color: "#e0af68", fontWeight: 700 }}>+ 미정산 금액</span>
@@ -419,10 +422,7 @@
             groups[e.client].total += amt(e); groups[e.client].count++; groups[e.client].items.push(e);
           });
           const grandTotal = entries.reduce((s, e) => s + amt(e), 0);
-          
-          // 미정산 총액 계산
           const totalUnpaid = Object.values(unpaidMap).reduce((s, v) => s + v, 0);
-          
           const allClients = [...new Set([...Object.keys(groups), ...Object.keys(unpaidMap)])];
              
           const doEdit = (e) => { const r = parseInt(editVal.replace(/,/g, ""), 10); if (!isNaN(r) && r > 0) onEditAmount(e.id, r); setEditId(null); };
@@ -615,20 +615,18 @@
           const [dateVal, setDateVal] = useState(today()); const [discount, setDiscount] = useState(false);
           const [showNew, setShowNew] = useState(false); const [newName, setNewName] = useState("");
              
-          // Swipe to close 로직
           const [startY, setStartY] = useState(null);
           const [dragY, setDragY] = useState(0);
              
           const onTouchStart = (e) => setStartY(e.touches[0].clientY);
           const onTouchMove = (e) => {
             if (startY === null) return;
-            const currentY = e.touches[0].clientY;
-            const diff = currentY - startY;
-            if (diff > 0) setDragY(diff); // 아래로 내릴 때만 움직임 적용
+            const diff = e.touches[0].clientY - startY;
+            if (diff > 0) setDragY(diff);
           };
           const onTouchEnd = () => {
-            if (dragY > 100) onClose(); // 100px 이상 내리면 닫힘
-            else setDragY(0); // 아니면 제자리 복귀
+            if (dragY > 100) onClose();
+            else setDragY(0);
             setStartY(null);
           };
              
@@ -655,27 +653,21 @@
                   display: "flex", flexDirection: "column"
                 }}
               >
-                {/* 상단 스와이프 핸들바 */}
                 <div style={{ width: 56, height: 6, background: "rgba(255,255,255,0.2)", borderRadius: 3, margin: "0 auto 28px" }} />
                 <div style={{ fontSize: 22, fontWeight: 900, color: "#fff", marginBottom: 28 }}>새 작업 기록</div>
              
-                {/* 첫 번째 줄: 날짜 + 업체명 입력 폼 개선 */}
                 <div style={{ ...S.field, width: "100%", boxSizing: "border-box" }}>
                   <div style={{ display: "flex", gap: 10, width: "100%" }}>
                     <input type="date" value={dateVal} onChange={(e) => setDateVal(e.target.value)} style={{ ...S.input, colorScheme: "dark", flex: 1, minWidth: 0, padding: "14px 12px" }} />
-                    
                     {!showNew && (
                       <select value={client} onChange={(e) => setClient(e.target.value)} style={{ ...S.select, flex: 1.5, minWidth: 0, padding: "14px 12px" }}>
                         <option value="">업체 선택</option>
                         {clients.map((c) => (<option key={c} value={c}>{c}</option>))}
                       </select>
                     )}
-                    
                     {showNew && (
                       <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="새 업체명" style={{ ...S.input, flex: 1.5, minWidth: 0, padding: "14px 12px" }} onKeyDown={(e) => e.key === "Enter" && addC()} autoFocus />
                     )}
-                    
-                    {/* 추가 & X 버튼 세로쓰기 방지 (nowrap, shrink: 0) */}
                     {showNew ? (
                       <button onClick={addC} style={{ ...S.confirmBtn, flexShrink: 0, whiteSpace: "nowrap", padding: "0 16px" }}>추가</button>
                     ) : (
@@ -685,7 +677,6 @@
                   </div>
                 </div>
              
-                {/* 두 번째 줄: 금액 부분 너비 오버플로우 방지 */}
                 <div style={{ ...S.field, width: "100%", boxSizing: "border-box" }}>
                   <div style={{ display: "flex", alignItems: "center", background: "rgba(0,0,0,0.2)", borderRadius: 18, border: "1px solid rgba(255,255,255,0.05)", padding: "10px 20px", width: "100%", boxSizing: "border-box" }}>
                     <input value={amount} onChange={(e) => setAmount(fmt(e.target.value))} placeholder="0" inputMode="numeric" style={{ flex: 1, background: "none", border: "none", color: discount ? "#f7768e" : "#7aa2f7", fontSize: 32, fontWeight: 900, textAlign: "right", outline: "none", padding: "16px 0", minWidth: 0 }} onKeyDown={(e) => e.key === "Enter" && submit()} />
@@ -694,7 +685,6 @@
                   <QuickBtns val={amount} setVal={setAmount} />
                 </div>
              
-                {/* 세 번째 줄: 할인 적용 및 내용 오버플로우 픽스 */}
                 <div style={{ display: "flex", gap: 12, marginBottom: 28, width: "100%", boxSizing: "border-box" }}>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: discount ? "rgba(247, 118, 142, 0.15)" : "rgba(255,255,255,0.05)", padding: "16px", borderRadius: 14, border: `1px solid ${discount ? "#f7768e" : "transparent"}`, transition: "0.2s", flexShrink: 0, whiteSpace: "nowrap" }}>
                     <input type="checkbox" checked={discount} onChange={(e) => setDiscount(e.target.checked)} style={{ accentColor: "#f7768e", width: 22, height: 22, margin: 0 }} />
@@ -731,23 +721,15 @@
           );
         }
           
-        // ─── Main App Component ───
-        function App() {
-          const [data, setData] = useState(() => load());
-          
-          const [pinState, setPinState] = useState(() => {
-            const loadedData = load();
-            return loadedData.pin ? "verify" : "setup";
-          });
-             
+        // ─── 실제 동작 앱 컴포넌트 ───
+        function MainApp({ data, persist, user }) {
+          const [pinState, setPinState] = useState(data.pin ? "verify" : "unlocked");
           const [vY, setVY] = useState(() => new Date().getFullYear());
           const [vM, setVM] = useState(() => new Date().getMonth());
           const [tab, setTab] = useState("summary");
           const [del, setDel] = useState(null);
           const [showAdd, setShowAdd] = useState(false);
           const [showClientManager, setShowClientManager] = useState(false);
-             
-          const persist = useCallback((d) => { setData(d); save(d); }, []);
              
           const handlePinSuccess = (enteredPin) => {
             if (pinState === "setup" || pinState === "change_new") {
@@ -856,12 +838,76 @@
             </div>
           );
         }
+
+        // ─── 인증 & 데이터 로딩 껍데기 (App Wrapper) ───
+        function App() {
+            const [user, setUser] = useState(null);
+            const [data, setData] = useState(null);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged(u => {
+                    if (u) {
+                        setUser(u);
+                        db.collection('users').doc(u.uid).get().then(doc => {
+                            if (doc.exists) {
+                                setData(doc.data());
+                            } else {
+                                // 기존에 폰에 적어둔 데이터가 있다면 서버로 마이그레이션(이사)
+                                const localRaw = localStorage.getItem(KEY);
+                                let defaultData = { entries: [], clients: [], payments: {}, pin: null };
+                                if (localRaw) { 
+                                    try { defaultData = JSON.parse(localRaw); } catch(e) {} 
+                                }
+                                setData(defaultData);
+                                db.collection('users').doc(u.uid).set(defaultData);
+                            }
+                            setLoading(false);
+                        });
+                    } else {
+                        setUser(null);
+                        setData(null);
+                        setLoading(false);
+                    }
+                });
+                return unsubscribe;
+            }, []);
+
+            const persist = useCallback((newData) => {
+                setData(newData);
+                if (user) {
+                    db.collection('users').doc(user.uid).set(newData).catch(console.error);
+                }
+            }, [user]);
+
+            if (loading) return <div style={S.overlay}><div style={{color:"#fff", fontSize: 18, fontWeight: 800}}>서버 연결 중...</div></div>;
+
+            if (!user) {
+                return (
+                    <div style={{...S.overlay, background: "#0f111a", flexDirection: "column", padding: 30, textAlign: "center"}}>
+                        <div style={{width: 80, height: 80, borderRadius: 24, background: "linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 30, boxShadow: "0 15px 35px rgba(122,162,247,0.3)"}}>
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#0f111a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        </div>
+                        <h1 style={{fontSize: 26, fontWeight: 900, color: "#fff", marginBottom: 10}}>정산기 Pro 클라우드</h1>
+                        <p style={{fontSize: 15, color: "#8a94b5", lineHeight: 1.5, marginBottom: 40, wordBreak: "keep-all"}}>
+                            데이터가 서버에 안전하게 자동 저장됩니다.<br/>폰을 바꾸거나 방문 기록을 지워도 안심하세요!
+                        </p>
+                        <button onClick={() => auth.signInWithRedirect(provider)} style={{...S.submitBtn, display: "flex", alignItems: "center", justifyContent: "center", gap: 12, background: "#fff", color: "#111", padding: "16px 0", borderRadius: 16}}>
+                            <svg width="24" height="24" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                            구글 계정으로 시작하기
+                        </button>
+                    </div>
+                );
+            }
+
+            return <MainApp data={data} persist={persist} user={user} />;
+        }
           
         // ─── Styles ───
         const S = {
           app: { background: "#0f111a", minHeight: "100vh", color: "#e8e8ed", maxWidth: 480, margin: "0 auto", position: "relative" },
           header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "calc(env(safe-area-inset-top) + 20px) 20px 24px", background: "transparent" },
-          navBtn: { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, color: "#8a94b5", width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "0.2s" },
+          navBtn: { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, color: "#8a94b5", width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "0.2s", flexShrink: 0 },
           headerCenter: { display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer" },
           card: { background: "rgba(36, 40, 59, 0.4)", borderRadius: 24, border: "1px solid rgba(255,255,255,0.03)" },
           calGrid: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6 },
