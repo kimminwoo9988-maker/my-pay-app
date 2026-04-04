@@ -212,7 +212,7 @@
                         {editName === c ? (
                            <div style={{display: "flex", gap: 8, width: "100%"}}>
                              <input autoFocus value={newVal} onChange={e => setNewVal(e.target.value)} style={{...S.input, padding: "8px 12px", margin: 0, flex: 1, fontSize: 15}} />
-                             <button onClick={() => { onUpdate(c, newVal); setEditName(null); }} style={{...S.confirmBtn, padding: "0 14px", borderRadius: 10}}>확인</button>
+                             <button onClick={() => { onUpdate(c, newVal); setEditName(null); }} style={{...S.confirmBtn, padding: "0 14px", borderRadius: 10, flexShrink: 0, whiteSpace: "nowrap", fontSize: 14}}>확인</button>
                            </div>
                         ) : (
                            <>
@@ -254,14 +254,22 @@
           );
         }
           
-        function TotalDashboard({ current }) {
+        function TotalDashboard({ current, unpaid }) {
           return (
-            <div style={{ ...S.card, padding: "30px 20px", marginBottom: 24, background: "linear-gradient(145deg, #1f2233 0%, #161824 100%)", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
-              <span style={{ fontSize: 15, color: "#8a94b5", fontWeight: 700, marginBottom: 12 }}>이번 달 총 합계</span>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                <span style={{ fontSize: 42, fontWeight: 900, color: "#fff", letterSpacing: "-1px" }}>{current.toLocaleString("ko-KR")}</span>
-                <span style={{ fontSize: 22, fontWeight: 700, color: "#7aa2f7" }}>원</span>
+            <div style={{ ...S.card, padding: "26px 20px", marginBottom: 24, background: "linear-gradient(145deg, #1f2233 0%, #161824 100%)", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+              <span style={{ fontSize: 14, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>이번 달 총 합계</span>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                {/* 글씨 크기 34px로 안정감 있게 유지 */}
+                <span style={{ fontSize: 34, fontWeight: 900, color: "#fff", letterSpacing: "-1px" }}>{current.toLocaleString("ko-KR")}</span>
+                <span style={{ fontSize: 18, fontWeight: 700, color: "#7aa2f7" }}>원</span>
               </div>
+              {/* 추가된 부분: 미정산 금액 표시 (0원보다 클 때만 나타남) */}
+              {unpaid > 0 && (
+                <div style={{ marginTop: 10, padding: "6px 14px", background: "rgba(224, 175, 104, 0.15)", borderRadius: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 13, color: "#e0af68", fontWeight: 700 }}>+ 미정산 금액</span>
+                  <span style={{ fontSize: 14, color: "#e0af68", fontWeight: 900 }}>{unpaid.toLocaleString("ko-KR")}원</span>
+                </div>
+              )}
             </div>
           );
         }
@@ -285,11 +293,11 @@
             cells.push(
               <div key={d} onClick={() => hasData && onSelect(isSelected ? null : d)} style={{ ...S.calCell, border: isSelected ? "1px solid rgba(122, 162, 247, 0.5)" : "1px solid transparent", background: hasData ? `rgba(${totals[d] < 0 ? "247,118,142" : "122,162,247"}, ${bgOpacity})` : "transparent", cursor: hasData ? "pointer" : "default", borderRadius: 14, transition: "all 0.3s" }}>
                 <span style={{ fontSize: 14, fontWeight: isToday ? 800 : 700, color: isToday ? "#0f111a" : dow === 0 ? "#f7768e" : dow === 6 ? "#7aa2f7" : "#a9b1d6", background: isToday ? "#7aa2f7" : "none", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>{d}</span>
-                {hasData && <span style={{ fontSize: 11, fontWeight: 800, marginTop: 4, color: totals[d] < 0 ? "#f7768e" : "#c0caf5" }}>{totals[d] < 0 ? "-" : "+"}{wonShort(Math.abs(totals[d]))}</span>}
+                {hasData && <span style={{ fontSize: 9.5, fontWeight: 800, marginTop: 4, color: totals[d] < 0 ? "#f7768e" : "#c0caf5", letterSpacing: "-0.5px" }}>{totals[d] < 0 ? "-" : "+"}{Math.abs(totals[d]).toLocaleString("ko-KR")}</span>}
               </div>
             );
           }
-          return <div style={{ ...S.card, padding: "20px 16px", marginBottom: 24 }}><div style={S.calGrid}>{cells}</div></div>;
+          return <div style={{ ...S.card, padding: "20px 12px", marginBottom: 24 }}><div style={S.calGrid}>{cells}</div></div>;
         }
           
         // ─── Image / Text / Share Receipt Modal ───
@@ -411,13 +419,17 @@
             groups[e.client].total += amt(e); groups[e.client].count++; groups[e.client].items.push(e);
           });
           const grandTotal = entries.reduce((s, e) => s + amt(e), 0);
+          
+          // 미정산 총액 계산
+          const totalUnpaid = Object.values(unpaidMap).reduce((s, v) => s + v, 0);
+          
           const allClients = [...new Set([...Object.keys(groups), ...Object.keys(unpaidMap)])];
              
           const doEdit = (e) => { const r = parseInt(editVal.replace(/,/g, ""), 10); if (!isNaN(r) && r > 0) onEditAmount(e.id, r); setEditId(null); };
              
           return (
             <div className="animate-fade">
-              <TotalDashboard current={grandTotal} />
+              <TotalDashboard current={grandTotal} unpaid={totalUnpaid} />
               <Calendar year={year} month={month} entries={entries} selectedDay={selDay} onSelect={setSelDay} />
              
               {selDay && (
@@ -530,15 +542,15 @@
              
           return (
             <div className="animate-fade">
-              <div style={{ background: "rgba(36, 40, 59, 0.6)", borderRadius: 24, padding: "28px 24px", marginBottom: 24, border: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>총 정산액</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: "#c0caf5" }}>{won(totalDue)}</div>
+              <div style={{ background: "rgba(36, 40, 59, 0.6)", borderRadius: 24, padding: "24px 20px", marginBottom: 24, border: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>총 정산액</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: "#c0caf5", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{won(totalDue)}</div>
                 </div>
-                <div style={{ width: 1, background: "rgba(255,255,255,0.1)", margin: "0 20px" }} />
-                <div style={{ flex: 1, textAlign: "right" }}>
-                  <div style={{ fontSize: 14, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>완료된 입금</div>
-                  <div style={{ fontSize: 26, fontWeight: 900, color: "#9ece6a" }}>{won(totalPaid)}</div>
+                <div style={{ width: 1, background: "rgba(255,255,255,0.1)", margin: "0 16px" }} />
+                <div style={{ flex: 1, textAlign: "right", minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>완료된 입금</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: "#9ece6a", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{won(totalPaid)}</div>
                 </div>
               </div>
              
