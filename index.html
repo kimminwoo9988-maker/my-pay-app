@@ -636,24 +636,43 @@
           );
         }
           
-        // ─── Swipe-to-Close Bottom Sheet Form ───
+        // ─── [수정됨] 스와이프 다운 애니메이션이 적용된 새 작업 기록 창 ───
         function BottomSheetForm({ clients, onAdd, onNewClient, onClose }) {
           const [client, setClient] = useState(""); const [amount, setAmount] = useState(""); const [desc, setDesc] = useState("");
           const [dateVal, setDateVal] = useState(today()); const [discount, setDiscount] = useState(false);
           const [showNew, setShowNew] = useState(false); const [newName, setNewName] = useState("");
-             
+          
+          // 물리적 드래그 상태 관리
           const [startY, setStartY] = useState(null);
           const [dragY, setDragY] = useState(0);
-             
+          const [isClosing, setIsClosing] = useState(false);
+          const [mounted, setMounted] = useState(false);
+          
+          // 화면이 렌더링되자마자 스르륵 올라오는 효과 트리거
+          useEffect(() => {
+            requestAnimationFrame(() => setMounted(true));
+          }, []);
+          
+          // 스르륵 내려가는 닫기 함수
+          const triggerClose = () => {
+            setIsClosing(true);
+            setMounted(false);
+            setTimeout(onClose, 300); // 0.3초 뒤에 완전히 컴포넌트 제거
+          };
+          
           const onTouchStart = (e) => setStartY(e.touches[0].clientY);
           const onTouchMove = (e) => {
-            if (startY === null) return;
+            if (startY === null || isClosing) return;
             const diff = e.touches[0].clientY - startY;
             if (diff > 0) setDragY(diff);
           };
           const onTouchEnd = () => {
-            if (dragY > 100) onClose();
-            else setDragY(0);
+            if (isClosing) return;
+            if (dragY > 100) {
+              triggerClose(); // 100px 이상 내렸으면 부드럽게 닫기
+            } else {
+              setDragY(0); // 조금 내리다 말았으면 제자리 복귀
+            }
             setStartY(null);
           };
              
@@ -661,13 +680,14 @@
             if (!client || !amount) return; const raw = parseInt(amount.replace(/,/g, ""), 10); if (isNaN(raw) || raw <= 0) return;
             const [y, m, d] = dateVal.split("-").map(Number);
             onAdd({ client, amount: raw, desc: discount ? "" : desc.trim(), date: new Date(y, m - 1, d, 12).toISOString(), discount });
+            triggerClose(); // 데이터 추가 후 스르륵 닫기
           };
+          
           const addC = () => { if (!newName.trim()) return; onNewClient(newName.trim()); setClient(newName.trim()); setNewName(""); setShowNew(false); };
              
           return (
-            <div style={{ ...S.overlay, alignItems: "flex-end", padding: 0 }} onClick={onClose}>
+            <div style={{ ...S.overlay, alignItems: "flex-end", padding: 0, opacity: mounted && !isClosing ? 1 : 0, transition: "opacity 0.3s ease-out" }} onClick={triggerClose}>
               <div 
-                className="animate-slide" 
                 onClick={(e) => e.stopPropagation()} 
                 onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
                 style={{ 
@@ -675,8 +695,10 @@
                   borderTopLeftRadius: 36, borderTopRightRadius: 36, 
                   padding: "28px 24px calc(env(safe-area-inset-bottom) + 30px)", 
                   boxShadow: "0 -10px 40px rgba(0,0,0,0.6)",
-                  transform: dragY > 0 ? `translateY(${dragY}px)` : "translateY(0)",
-                  transition: dragY > 0 ? "none" : "transform 0.3s ease-out",
+                  // 손가락 위치에 따라 transform을 부드럽게 연동
+                  transform: mounted && !isClosing ? (dragY > 0 ? `translateY(${dragY}px)` : "translateY(0)") : "translateY(100%)",
+                  // 손가락으로 누르고 있을 땐 transition 끄고, 손을 떼거나 닫힐 땐 켜기
+                  transition: dragY > 0 ? "none" : "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
                   display: "flex", flexDirection: "column"
                 }}
               >
@@ -728,27 +750,7 @@
           );
         }
           
-        function DeleteModal({ entry, onConfirm, onCancel }) {
-          if (!entry) return null;
-          return (
-            <div style={S.overlay}>
-              <div className="animate-pop" style={{ background: "#1a1b26", borderRadius: 24, padding: 32, width: "100%", maxWidth: 340, border: "1px solid rgba(255,255,255,0.1)", textAlign: "center" }}>
-                <div style={{ width: 60, height: 60, borderRadius: "50%", background: "rgba(231, 76, 60, 0.1)", color: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto 20px" }}>🗑</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#fff", marginBottom: 16 }}>기록 삭제</div>
-                <div style={{ fontSize: 16, color: "#8a94b5", lineHeight: 1.6, marginBottom: 28, wordBreak: "keep-all" }}>
-                  <span style={{ color: "#fff", fontWeight: 800 }}>{entry.client}</span>의 <br />
-                  {tag(entry)} ({won(entry.amount)})<br />기록을 정말 삭제할까요?
-                </div>
-                <div style={{ display: "flex", gap: 12 }}>
-                  <button onClick={onCancel} style={{ flex: 1, padding: "16px 0", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 14, color: "#a9b1d6", fontSize: 16, fontWeight: 800, cursor: "pointer", transition: "0.2s" }} onPointerDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")} onPointerUp={(e) => (e.currentTarget.style.transform = "scale(1)")}>취소</button>
-                  <button onClick={onConfirm} style={{ flex: 1, padding: "16px 0", background: "#e74c3c", border: "none", borderRadius: 14, color: "#fff", fontSize: 16, fontWeight: 900, cursor: "pointer", transition: "0.2s" }} onPointerDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")} onPointerUp={(e) => (e.currentTarget.style.transform = "scale(1)")}>삭제하기</button>
-                </div>
-              </div>
-            </div>
-          );
-        }
-          
-        // ─── 실제 동작 앱 컴포넌트 ───
+        // ─── Main App Component ───
         function MainApp({ data, persist, user }) {
           const [pinState, setPinState] = useState(data.pin ? "verify" : "unlocked");
           const [vY, setVY] = useState(() => new Date().getFullYear());
@@ -759,7 +761,7 @@
           const [showClientManager, setShowClientManager] = useState(false);
           const [showSettings, setShowSettings] = useState(false);
              
-          // 👇 추가된 부분: 백그라운드(화면 숨김) 감지 시 자동으로 화면 잠금
+          // 앱이 백그라운드에 갔다가 다시 돌아올 때 암호 잠금 트리거
           useEffect(() => {
             const handleVisibilityChange = () => {
               if (document.visibilityState === "hidden" && data.pin) {
@@ -813,7 +815,8 @@
           const initialUnpaidMap = calcUnpaid(unpaidEntries, data.payments, curMk);
           const currentUnpaidMap = calcUnpaid(unpaidEntries, data.payments);
              
-          const onAdd = (entry) => { persist({ ...data, entries: [...data.entries, { ...entry, id: id(), paid: false }] }); setShowAdd(false); };
+          // 모달창 닫는 로직을 모달 자체가 처리하도록 분리
+          const onAdd = (entry) => { persist({ ...data, entries: [...data.entries, { ...entry, id: id(), paid: false }] }); };
           const onNewClient = (name) => { if (!data.clients.includes(name)) persist({ ...data, clients: [...data.clients, name] }); };
           const onPartialPay = (client, key, amount) => { const pk = `${key}::${client}`; persist({ ...data, payments: { ...data.payments, [pk]: ((data.payments || {})[pk] || 0) + amount } }); };
           const onResetPay = (client) => { const newPay = { ...(data.payments || {}) }; delete newPay[`${curMk}::${client}`]; persist({ ...data, payments: newPay }); };
