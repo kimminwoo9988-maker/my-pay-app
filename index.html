@@ -229,8 +229,12 @@
           const hasUnpaidDetail = unpaid > 0 && unpaidItems && unpaidItems.length > 0;
 
           return (
-            <div style={S.overlay} onClick={onClose}>
-              <div className="animate-pop" onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, maxHeight: "85vh", overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", gap: 16 }}>
+            // 변경된 부분: alignItems를 flex-start로 변경하여 상단이 잘리지 않게 하고, 부모 영역 전체가 스크롤되도록 설정했습니다.
+            <div style={{ ...S.overlay, alignItems: "flex-start", overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "40px 24px" }} onClick={onClose}>
+              
+              // 변경된 부분: maxHeight를 없애고 margin: "auto"를 주어, 내용이 짧을 땐 중앙에, 길 땐 전체가 자연스럽게 늘어나며 스크롤되도록 했습니다.
+              <div className="animate-pop" onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, margin: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
+                
                 <div id="receipt-capture-area" style={{ background: "#f6f4ef", padding: "52px 38px 44px", color: "#111", fontFamily: "'Pretendard', -apple-system, sans-serif", minHeight: 520 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 44 }}>
                     <div><div style={{ fontSize: 11, fontWeight: 800, color: "#bbb", letterSpacing: "3px", marginBottom: 6 }}>ISSUED BY</div><div style={{ fontSize: 20, fontWeight: 900, color: "#222", letterSpacing: "1px" }}>KIM MINWOO</div></div>
@@ -279,7 +283,6 @@
             </div>
           );
         }
-
         // ─── [수정2] SummaryTab에 allEntries prop 추가 ───
         function SummaryTab({ entries, unpaidMap, year, month, onDelete, onEditEntry, allEntries }) {
           const [selDay, setSelDay] = useState(null); const [openClient, setOpenClient] = useState(null); const [receiptClient, setReceiptClient] = useState(null);
