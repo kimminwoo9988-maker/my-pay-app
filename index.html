@@ -119,7 +119,7 @@
             <h3 style={{marginTop:0, marginBottom: 20, fontSize: 20, fontWeight: 900}}>업체 목록 관리</h3>
             <div style={{maxHeight: "50vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, paddingRight: 5}}>
               {(clients||[]).map(c => <div key={c} style={{display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.05)", padding: "12px 16px", borderRadius: 14}}>
-                {editName === c ? <div style={{display: "flex", gap: 8, width: "100%"}}><input autoFocus value={newVal} onChange={e => setNewVal(e.target.value)} style={{...S.input, padding: "8px 12px", margin: 0, flex: 1, fontSize: 15}} /><button onClick={() => { onUpdate(c, newVal); setEditName(null); }} style={{...S.confirmBtn, padding: "0 14px", borderRadius: 10, flexShrink: 0, fontSize: 14}}>확인</button></div>
+                {editName === c ? <div style={{display: "flex", gap: 8, width: "100%", alignItems: "center"}}><input autoFocus value={newVal} onChange={e => setNewVal(e.target.value)} onKeyDown={e => e.key==="Enter"&&(onUpdate(c, newVal), setEditName(null))} style={{...S.input, padding: "8px 12px", margin: 0, flex: 1, fontSize: 15, minWidth: 0}} /><button onClick={() => { onUpdate(c, newVal); setEditName(null); }} style={{...S.confirmBtn, padding: "8px 14px", borderRadius: 10, flexShrink: 0, fontSize: 14, height: "100%"}}>확인</button></div>
                 : <><span style={{fontSize: 16, fontWeight: 800}}>{c}</span><div style={{display: "flex", gap: 8}}><button onClick={() => { setEditName(c); setNewVal(c); }} style={{...S.editBtn, padding: "6px 12px", borderRadius: 8}}>수정</button><button onClick={() => onDelete(c)} style={{...S.delBtn, width: 32, height: 32, borderRadius: 8}}>✕</button></div></>}
               </div>)}
               {clients.length === 0 && <div style={{textAlign: "center", color: "#8a94b5", padding: "30px 0", fontSize: 15}}>등록된 업체가 없습니다.</div>}
@@ -205,7 +205,18 @@
           const generateImageBlob = async () => {
             if (!window.html2canvas) { await new Promise(r => { const s = document.createElement("script"); s.src = "https://html2canvas.hertzen.com/dist/html2canvas.min.js"; s.onload = r; document.head.appendChild(s); }); }
             const el = document.getElementById("receipt-capture-area");
-            const canvas = await window.html2canvas(el, { backgroundColor: "#f6f4ef", scale: 3, useCORS: true });
+            
+            // 이미지 전체 저장을 위한 DOM 복제 방식 적용
+            const clone = el.cloneNode(true);
+            document.body.appendChild(clone);
+            clone.style.position = "absolute";
+            clone.style.left = "-9999px";
+            clone.style.top = "0px";
+            clone.style.width = el.offsetWidth + "px";
+            
+            const canvas = await window.html2canvas(clone, { backgroundColor: "#f6f4ef", scale: 3, useCORS: true, scrollY: 0 });
+            
+            document.body.removeChild(clone);
             return new Promise(r => canvas.toBlob(r, "image/png"));
           };
           const saveImage = async () => { setIsProcessing(true); try { const blob = await generateImageBlob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.download = `정산서_${client}_${year}년${month+1}월.png`; a.href = url; a.click(); URL.revokeObjectURL(url); } catch { alert("이미지 저장 오류"); } finally { setIsProcessing(false); } };
@@ -219,7 +230,7 @@
 
           return (
             <div style={S.overlay} onClick={onClose}>
-              <div className="animate-pop" onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, maxHeight: "90vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
+              <div className="animate-pop" onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, maxHeight: "85vh", overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", gap: 16 }}>
                 <div id="receipt-capture-area" style={{ background: "#f6f4ef", padding: "52px 38px 44px", color: "#111", fontFamily: "'Pretendard', -apple-system, sans-serif", minHeight: 520 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 44 }}>
                     <div><div style={{ fontSize: 11, fontWeight: 800, color: "#bbb", letterSpacing: "3px", marginBottom: 6 }}>ISSUED BY</div><div style={{ fontSize: 20, fontWeight: 900, color: "#222", letterSpacing: "1px" }}>KIM MINWOO</div></div>
@@ -246,7 +257,6 @@
                     </tbody>
                   </table>
                   <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0" }}><span style={{ fontSize: 13, fontWeight: 700, color: "#888" }}>Sub total</span><span style={{ fontSize: 14, fontWeight: 800, color: "#333" }}>{Math.abs(currentTotal).toLocaleString("ko-KR")}</span></div>
                     {unpaid !== 0 && <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0" }}><span style={{ fontSize: 13, fontWeight: 700, color: "#888" }}>{unpaid>0?"미정산 이월":"선지급 차감"}</span><span style={{ fontSize: 14, fontWeight: 800, color: unpaid>0?"#b8860b":"#27ae60" }}>{unpaid>0?"+":"-"}{Math.abs(unpaid).toLocaleString("ko-KR")}</span></div>}
                     <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 14, marginTop: 8, borderTop: "2px solid #222" }}><span style={{ fontSize: 15, fontWeight: 900, color: "#111" }}>Total</span><div style={{ textAlign: "right" }}><span style={{ fontSize: 20, fontWeight: 900, color: "#111" }}>{finalTotal<0?"0":Math.abs(finalTotal).toLocaleString("ko-KR")}</span>{finalTotal < 0 && <div style={{ fontSize: 11, color: "#27ae60", fontWeight: 800, marginTop: 2 }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}</div></div>
                   </div>
