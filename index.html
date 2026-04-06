@@ -43,7 +43,7 @@
         // ─── Constants & Helpers ───
         const MONTHS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
         const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
-        const KEY = "freelance-tracker-v17"; 
+        const KEY = "freelance-tracker-v19"; 
         const COLORS = ["#7aa2f7", "#bb9af7", "#9ece6a", "#e0af68", "#f7768e", "#7dcfff", "#ff9e64", "#73daca"];
           
         const id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -63,8 +63,12 @@
 
         const sanitizeData = (raw) => {
             if (!raw) return { entries: [], clients: [], payments: {}, pin: null };
+            
+            const validEntries = Array.isArray(raw.entries) ? raw.entries.filter(e => e && e.client && e.date) : [];
+            const uniqueEntries = Array.from(new Map(validEntries.map(e => [e.id, e])).values());
+
             return {
-                entries: Array.isArray(raw.entries) ? raw.entries.filter(e => e && e.client && e.date) : [],
+                entries: uniqueEntries,
                 clients: Array.isArray(raw.clients) ? raw.clients : [],
                 payments: raw.payments || {},
                 pin: raw.pin || null
@@ -95,13 +99,15 @@
         // ─── Logic Helpers ───
         const calcBalance = (entries, payments, excludeMkStart) => {
           const bal = {};
+          
           (entries || []).forEach(e => {
             const d = new Date(e.date);
             const eMk = mk(d.getFullYear(), d.getMonth());
             if (excludeMkStart && eMk >= excludeMkStart) return;
             
-            bal[e.client] = (bal[e.client] || 0) + amt(e);
-            if (e.paid) bal[e.client] -= amt(e);
+            if (!e.paid) {
+               bal[e.client] = (bal[e.client] || 0) + amt(e);
+            }
           });
           
           Object.entries(payments || {}).forEach(([pk, val]) => {
@@ -109,6 +115,7 @@
             if(parts.length !== 2) return;
             const pMk = parts[0]; const client = parts[1];
             if (excludeMkStart && pMk >= excludeMkStart) return;
+            
             bal[client] = (bal[client] || 0) - val;
           });
           
@@ -240,6 +247,7 @@
           );
         }
 
+        // 설정 모달
         function SettingsModal({ onChangePin, onManageClients, onResetData, onLogout, onClose }) {
           return (
             <div style={S.overlay} onClick={onClose}>
@@ -255,7 +263,6 @@
                   
                   <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "8px 0" }} />
                   
-                  {/* 전체 초기화 버튼 추가 */}
                   <button onClick={() => { 
                       if(window.confirm("⚠️ 경고: 정말 모든 데이터를 초기화하시겠습니까?\n이 작업은 절대 복구할 수 없습니다!")) {
                           if(window.confirm("마지막 확인입니다. 정말 전부 지울까요?")) {
@@ -589,7 +596,7 @@
           );
         }
           
-        function PaymentTab({ entries, unpaidMap, endOfMonthUnpaidMap, currentUnpaidMap, onFullCheck, onPartialPay, onResetPay, monthKey, payments }) {
+        function PaymentTab({ entries, unpaidMap, endOfMonthUnpaidMap, onFullCheck, onPartialPay, onResetPay, monthKey, payments }) {
           const byClient = {};
           (entries || []).forEach((e) => { 
             if (!byClient[e.client]) byClient[e.client] = []; 
@@ -609,7 +616,6 @@
             const paid = items.length > 0 && items.every((e) => e.paid); 
             const paidAmt = (payments && payments[`${monthKey}::${client}`]) || 0;
             
-            // 이번 달까지의 최종 빚(endUnpaid)이 0 이하면 체크표시(입금 완료)
             const done = (items.length === 0 || paid) && endUnpaid <= 0;
             return { client, items, thisTotal, unpaid, total, paid, paidAmt, done };
           }).filter(Boolean);
@@ -698,7 +704,7 @@
           );
         }
           
-        // ─── 부드러운 스와이프 다운 ───
+        // ─── 부드러운 스와이프 다운 (Drag to Dismiss) ───
         function BottomSheetForm({ clients, onAdd, onNewClient, onClose }) {
           const [client, setClient] = useState(""); const [amount, setAmount] = useState(""); const [desc, setDesc] = useState("");
           const [dateVal, setDateVal] = useState(today()); const [discount, setDiscount] = useState(false);
@@ -707,15 +713,19 @@
           const [dragY, setDragY] = useState(0);
           const startY = useRef(null);
          
-          // 상단 손잡이에서만 스와이프를 감지하도록 하여 입력 중 오작동 방지
-          const onTouchStart = (e) => { startY.current = e.touches[0].clientY; };
+          // 전체 창 어디서든 터치 스와이프가 작동하도록 수정
+          const onTouchStart = (e) => { 
+             // 입력창 내부를 터치한 경우는 드래그 무시 (스크롤 방해 방지)
+             if(e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'select') return;
+             startY.current = e.touches[0].clientY; 
+          };
           const onTouchMove = (e) => {
             if (startY.current === null) return;
             const diff = e.touches[0].clientY - startY.current;
             if (diff > 0) setDragY(diff);
           };
           const onTouchEnd = () => {
-            if (dragY > 100) onClose(); 
+            if (dragY > 60) onClose(); 
             else setDragY(0); 
             startY.current = null;
           };
@@ -733,21 +743,19 @@
               <div 
                 className="animate-slide" 
                 onClick={(e) => e.stopPropagation()} 
+                onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
                 style={{ 
                   background: "#1a1b26", width: "100%", maxWidth: 480, 
                   borderTopLeftRadius: 36, borderTopRightRadius: 36, 
                   padding: "0 24px calc(env(safe-area-inset-bottom) + 30px)", 
                   boxShadow: "0 -10px 40px rgba(0,0,0,0.6)",
                   display: "flex", flexDirection: "column",
+                  touchAction: "pan-x", // 세로 스크롤만 막고 부드럽게 끌어내려지도록 처리
                   transform: dragY > 0 ? `translateY(${dragY}px)` : "translateY(0)",
                   transition: dragY > 0 ? "none" : "transform 0.2s ease-out"
                 }}
               >
-                {/* 드래그 손잡이 영역 */}
-                <div 
-                  onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-                  style={{ width: "100%", padding: "16px 0 24px", display: "flex", justifyContent: "center", cursor: "grab", touchAction: "none" }}
-                >
+                <div style={{ width: "100%", padding: "16px 0 24px", display: "flex", justifyContent: "center" }}>
                   <div style={{ width: 60, height: 6, background: "rgba(255,255,255,0.2)", borderRadius: 3 }} />
                 </div>
                 
@@ -823,7 +831,8 @@
         function MainApp({ data, persist, user }) {
           const safeData = sanitizeData(data);
 
-          const [pinState, setPinState] = useState(safeData.pin ? "verify" : "unlocked");
+          // 앱 최초 실행 시: 비밀번호가 없으면 무조건 "setup"(설정) 화면으로 진입
+          const [pinState, setPinState] = useState(safeData.pin ? "verify" : "setup");
           const [vY, setVY] = useState(() => new Date().getFullYear());
           const [vM, setVM] = useState(() => new Date().getMonth());
           const [tab, setTab] = useState("summary");
@@ -832,14 +841,24 @@
           const [showClientManager, setShowClientManager] = useState(false);
           const [showSettings, setShowSettings] = useState(false);
               
+          // iOS 백그라운드 전환 및 브라우저 화면 숨김 감지 (완벽한 잠금 처리)
           useEffect(() => {
-            const handleVisibilityChange = () => {
-              if (document.visibilityState === "hidden" && safeData.pin) {
-                setPinState("verify");
-              }
+            const lockApp = () => {
+              if (safeData.pin) setPinState("verify");
             };
+            
+            const handleVisibilityChange = () => {
+              if (document.visibilityState === "hidden") lockApp();
+            };
+            
             document.addEventListener("visibilitychange", handleVisibilityChange);
-            return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+            // iOS 사파리 및 PWA의 백그라운드 전환 이벤트를 완벽히 잡기 위해 pagehide 추가
+            window.addEventListener("pagehide", lockApp);
+            
+            return () => {
+              document.removeEventListener("visibilitychange", handleVisibilityChange);
+              window.removeEventListener("pagehide", lockApp);
+            };
           }, [safeData.pin]);
 
           const handlePinSuccess = (enteredPin) => {
@@ -878,7 +897,6 @@
             return <LockScreen mode={pinState} savedPin={safeData.pin} onSuccess={handlePinSuccess} onCancel={pinState.startsWith("change_") ? () => setPinState("unlocked") : null} />;
           }
               
-          // 시점 기준 계산기 (과거/현재/미래 이월금 분리)
           const curMk = mk(vY, vM);
           const nextMonthMk = vM === 11 ? mk(vY + 1, 0) : mk(vY, vM + 1);
           
@@ -887,39 +905,32 @@
             return d.getFullYear() === vY && d.getMonth() === vM; 
           });
 
-          // 핵심 수정 부분: 시점에 따라 미정산 금액을 철저하게 분리 계산합니다.
-          const initialUnpaidMap = calcBalance(safeData.entries, safeData.payments, curMk); // 이번 달이 시작되기 전까지 누적된 잔액
-          const endOfMonthUnpaidMap = calcBalance(safeData.entries, safeData.payments, nextMonthMk); // 이번 달 끝난 시점의 최종 잔액
-          const currentUnpaidMap = calcBalance(safeData.entries, safeData.payments); // 전체 누적 (참고용)
+          const initialUnpaidMap = calcBalance(safeData.entries, safeData.payments, curMk); 
+          const endOfMonthUnpaidMap = calcBalance(safeData.entries, safeData.payments, nextMonthMk); 
               
           const onAdd = (entry) => { persist({ ...safeData, entries: [...safeData.entries, { ...entry, id: id(), paid: false }] }); };
           const onNewClient = (name) => { if (!safeData.clients.includes(name)) persist({ ...safeData, clients: [...safeData.clients, name] }); };
           const onPartialPay = (client, key, amount) => { const pk = `${key}::${client}`; persist({ ...safeData, payments: { ...safeData.payments, [pk]: (safeData.payments[pk] || 0) + amount } }); };
           const onResetPay = (client) => { const newPay = { ...safeData.payments }; delete newPay[`${curMk}::${client}`]; persist({ ...safeData, payments: newPay }); };
          
-          // 입금 완료 체크(정산 완료) 시 수학적 오류 없는 완벽한 지불 처리
           const onFullCheck = (client, key, check) => {
             let ent = safeData.entries; 
             let pay = { ...safeData.payments }; 
             const pk = `${key}::${client}`;
             
             if (check) {
-              // 1. 이번 달 항목들을 paid 처리
               ent = ent.map((e) => { 
                 const d = new Date(e.date); 
                 return e.client === client && mk(d.getFullYear(), d.getMonth()) === key ? { ...e, paid: true } : e; 
               });
               
-              // 2. 이번 달까지 누적된 실제 남은 빚(또는 선급금) 계산
               const tempBal = calcBalance(ent, pay, nextMonthMk);
               const remaining = tempBal[client] || 0;
               
-              // 3. 남은 빚이 있다면 이번 달에 입금된 것으로 처리하여 0원으로 만듦
               if (remaining > 0) {
                  pay[pk] = (pay[pk] || 0) + remaining;
               }
             } else {
-              // 체크 해제 시 이번 달 paid를 false로 돌리고, 이번 달의 모든 입금 기록 삭제
               ent = ent.map((e) => { 
                 const d = new Date(e.date); 
                 return e.client === client && mk(d.getFullYear(), d.getMonth()) === key ? { ...e, paid: false } : e; 
@@ -936,10 +947,11 @@
           };
           const onEditAmt = (id, a) => { persist({ ...safeData, entries: safeData.entries.map((e) => (e.id === id ? { ...e, amount: a } : e)) }); };
           
-          // 전체 데이터 리셋
+          // ✨ 데이터 완전 초기화 후 곧바로 비밀번호 설정 화면(setup)으로 강제 전환
           const onResetData = () => {
              persist({ entries: [], clients: [], payments: {}, pin: null });
-             alert("모든 데이터가 깨끗하게 초기화되었습니다.");
+             setPinState("setup"); 
+             alert("모든 데이터가 깨끗하게 초기화되었습니다. 새로운 비밀번호를 설정해주세요!");
           };
               
           const prev = () => { if (vM === 0) { setVY(vY - 1); setVM(11); } else { setVM(vM - 1); } };
@@ -954,7 +966,7 @@
               
               <div style={{ padding: "0 20px 140px" }}>
                 {tab === "summary" && <SummaryTab entries={monthEntries} unpaidMap={initialUnpaidMap} year={vY} month={vM} onDelete={setDel} onEditAmount={onEditAmt} />}
-                {tab === "payment" && <PaymentTab entries={monthEntries} unpaidMap={initialUnpaidMap} endOfMonthUnpaidMap={endOfMonthUnpaidMap} currentUnpaidMap={currentUnpaidMap} onFullCheck={onFullCheck} onPartialPay={onPartialPay} onResetPay={onResetPay} monthKey={curMk} payments={safeData.payments} />}
+                {tab === "payment" && <PaymentTab entries={monthEntries} unpaidMap={initialUnpaidMap} endOfMonthUnpaidMap={endOfMonthUnpaidMap} onFullCheck={onFullCheck} onPartialPay={onPartialPay} onResetPay={onResetPay} monthKey={curMk} payments={safeData.payments} />}
               </div>
               
               <div style={{ position: "fixed", bottom: "max(24px, env(safe-area-inset-bottom))", left: 20, right: 20, maxWidth: 440, margin: "0 auto", height: 76, background: "rgba(26, 27, 38, 0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderRadius: 38, border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px", zIndex: 30, boxShadow: "0 24px 48px rgba(0,0,0,0.5)" }}>
