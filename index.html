@@ -22,7 +22,7 @@
     <script type="text/babel">
         const { useState, useEffect, useCallback, useRef } = React;
      
-        // ─── Firebase 서버 초기화 ───
+        // ─── Firebase 서버 초기화 세팅 ───
         const firebaseConfig = {
           apiKey: "AIzaSyCYjTb8SN-Vq7GoF2LPem_4VRQ8fPb8oFw",
           authDomain: "pp-backup-c0ad2.firebaseapp.com",
@@ -40,30 +40,6 @@
         const db = firebase.firestore();
         const provider = new firebase.auth.GoogleAuthProvider();
 
-        // ─── 하얀 화면 방지 시스템 (Error Boundary) ───
-        class ErrorBoundary extends React.Component {
-          constructor(props) { super(props); this.state = { hasError: false, error: null }; }
-          static getDerivedStateFromError(error) { return { hasError: true, error }; }
-          render() {
-            if (this.state.hasError) {
-              return (
-                <div style={{ padding: "60px 20px", color: "#fff", textAlign: "center", background: "#0f111a", minHeight: "100vh" }}>
-                  <div style={{ fontSize: 50, marginBottom: 20 }}>🚨</div>
-                  <h2 style={{ color: "#f7768e", fontWeight: 900 }}>화면을 불러오지 못했습니다!</h2>
-                  <p style={{ color: "#a9b1d6", lineHeight: 1.6, marginBottom: 30, wordBreak: "keep-all" }}>
-                    과거에 비정상적으로 저장된 데이터와 충돌이 발생했습니다.<br/>아래 버튼을 눌러 새로고침 해주세요.
-                  </p>
-                  <div style={{ background: "rgba(255,255,255,0.05)", padding: 16, borderRadius: 12, fontSize: 11, color: "#565f89", wordBreak: "break-all", marginBottom: 30, textAlign: "left" }}>
-                    {this.state.error?.toString()}
-                  </div>
-                  <button onClick={() => window.location.reload()} style={{ padding: "16px 32px", background: "#7aa2f7", border: "none", borderRadius: 14, color: "#0f111a", fontWeight: 900, fontSize: 16, cursor: "pointer" }}>앱 새로고침</button>
-                </div>
-              );
-            }
-            return this.props.children;
-          }
-        }
-
         // ─── Constants & Helpers ───
         const MONTHS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
         const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -74,8 +50,8 @@
         const mk = (y, m) => `${y}-${String(m + 1).padStart(2, "0")}`;
         const won = (n) => (n === 0 ? "0원" : Math.abs(n).toLocaleString("ko-KR") + "원");
           
-        const amt = (e) => (e?.discount ? -(e.amount||0) : (e?.amount||0));
-        const tag = (e) => (e?.discount ? "할인" : e?.desc || "작업");
+        const amt = (e) => (e.discount ? -e.amount : e.amount);
+        const tag = (e) => (e.discount ? "할인" : e.desc || "작업");
         const fmt = (v) => {
           const n = String(v).replace(/[^0-9]/g, "");
           return n ? parseInt(n, 10).toLocaleString("ko-KR") : "";
@@ -84,15 +60,28 @@
           const d = new Date();
           return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         };
+
+        // 데이터 충돌을 원천 차단하는 강력한 필터링 함수
+        const sanitizeData = (raw) => {
+            if (!raw) return { entries: [], clients: [], payments: {}, pin: null };
+            return {
+                entries: Array.isArray(raw.entries) ? raw.entries.filter(e => e && e.client && e.date) : [],
+                clients: Array.isArray(raw.clients) ? raw.clients : [],
+                payments: raw.payments || {},
+                pin: raw.pin || null
+            };
+        };
           
         // ─── Global Styles ───
         const GlobalStyle = () => (
           <style>{`
             @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+            @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
             @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
             @keyframes popIn { 0% { transform: scale(0.95) translateY(10px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
             @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
             
+            .animate-slide { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
             .animate-fade { animation: fadeIn 0.25s ease forwards; }
             .animate-pop { animation: popIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
             .animate-shake { animation: shake 0.4s ease-in-out; }
@@ -104,22 +93,10 @@
           `}</style>
         );
           
-        // ─── [핵심 방어벽] 데이터 오류 방지(Sanitize) 시스템 ───
-        // 비정상적인 형태나 날짜/업체가 없는 유령 데이터가 화면을 망가뜨리지 못하게 필터링합니다.
-        const sanitizeData = (raw) => {
-            if (!raw) return { entries: [], clients: [], payments: {}, pin: null };
-            return {
-                entries: (Array.isArray(raw.entries) ? raw.entries : []).filter(e => e && typeof e === 'object' && e.client && e.date),
-                clients: (Array.isArray(raw.clients) ? raw.clients : []).filter(c => c && typeof c === 'string'),
-                payments: raw.payments || {},
-                pin: raw.pin || null
-            };
-        };
-
+        // ─── Logic Helpers (과납금/선지급 포함) ───
         const calcBalance = (entries, payments, excludeMkStart) => {
           const bal = {};
           (entries || []).forEach(e => {
-            if (!e || !e.date) return;
             const d = new Date(e.date);
             const eMk = mk(d.getFullYear(), d.getMonth());
             if (excludeMkStart && eMk >= excludeMkStart) return;
@@ -152,7 +129,7 @@
           return newPay;
         };
           
-        // ─── Lock Screen (PIN Pad) ───
+        // ─── Lock Screen ───
         function LockScreen({ mode, savedPin, onSuccess, onCancel }) {
           const [pin, setPin] = useState("");
           const [error, setError] = useState(false);
@@ -229,7 +206,6 @@
           );
         }
 
-        // ─── Client Management Modal ───
         function ClientManagerModal({ clients, onUpdate, onDelete, onClose }) {
           const [editName, setEditName] = useState(null);
           const [newVal, setNewVal] = useState("");
@@ -265,7 +241,6 @@
           );
         }
 
-        // ─── 통합 설정 메뉴 모달 ───
         function SettingsModal({ onChangePin, onManageClients, onLogout, onClose }) {
           return (
             <div style={S.overlay} onClick={onClose}>
@@ -347,7 +322,6 @@
           const now = new Date(); const isNow = now.getFullYear() === year && now.getMonth() === month; const todayDate = now.getDate();
              
           const totals = (entries||[]).reduce((acc, e) => { 
-            if(!e || !e.date) return acc;
             const d = new Date(e.date).getDate(); 
             if(!isNaN(d)) acc[d] = (acc[d] || 0) + amt(e); 
             return acc; 
@@ -492,7 +466,6 @@
              
           const groups = {};
           (entries || []).forEach((e) => {
-            if (!e || !e.client) return;
             if (!groups[e.client]) groups[e.client] = { total: 0, count: 0, items: [] };
             groups[e.client].total += amt(e); groups[e.client].count++; groups[e.client].items.push(e);
           });
@@ -504,7 +477,7 @@
              
           return (
             <div className="animate-fade">
-              <TotalDashboard current={grandTotal} unpaidMap={unpaidMap || {}} />
+              <TotalDashboard current={grandTotal} unpaidMap={unpaidMap} />
               <Calendar year={year} month={month} entries={entries} selectedDay={selDay} onSelect={setSelDay} />
              
               {selDay && (
@@ -513,7 +486,7 @@
                     <span style={{ fontSize: 18, fontWeight: 800, color: "#c0caf5" }}>{month + 1}월 {selDay}일</span>
                     <button onClick={() => setSelDay(null)} style={{ background: "none", border: "none", color: "#565f89", fontSize: 20, cursor: "pointer", padding: "0 8px" }}>✕</button>
                   </div>
-                  {(entries || []).filter((e) => e && e.date && new Date(e.date).getDate() === selDay).map((e) => (
+                  {(entries || []).filter((e) => new Date(e.date).getDate() === selDay).map((e) => (
                     <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                       <div>
                         <div style={{ fontSize: 16, fontWeight: 800, color: "#e0e2eb" }}>{e.client}</div>
@@ -606,7 +579,6 @@
         function PaymentTab({ entries, unpaidMap, currentUnpaidMap, onFullCheck, onPartialPay, onResetPay, monthKey, payments }) {
           const byClient = {};
           (entries || []).forEach((e) => { 
-            if(!e || !e.client) return;
             if (!byClient[e.client]) byClient[e.client] = []; 
             byClient[e.client].push(e); 
           });
@@ -709,35 +681,23 @@
           );
         }
           
-        // ─── Swipe-to-Close Bottom Sheet Form ───
+        // ─── [수정 완료] 가장 안전하고 부드러운 스와이프 다운 ───
         function BottomSheetForm({ clients, onAdd, onNewClient, onClose }) {
           const [client, setClient] = useState(""); const [amount, setAmount] = useState(""); const [desc, setDesc] = useState("");
           const [dateVal, setDateVal] = useState(today()); const [discount, setDiscount] = useState(false);
           const [showNew, setShowNew] = useState(false); const [newName, setNewName] = useState("");
              
-          const [isMounted, setIsMounted] = useState(false);
-          const [isClosing, setIsClosing] = useState(false);
           const [dragY, setDragY] = useState(0);
           const startY = useRef(null);
           
-          useEffect(() => {
-            requestAnimationFrame(() => setIsMounted(true));
-          }, []);
-          
-          const triggerClose = () => {
-            setIsClosing(true);
-            setTimeout(onClose, 250);
-          };
-          
           const onTouchStart = (e) => { startY.current = e.touches[0].clientY; };
           const onTouchMove = (e) => {
-            if (startY.current === null || isClosing) return;
+            if (startY.current === null) return;
             const diff = e.touches[0].clientY - startY.current;
             if (diff > 0) setDragY(diff);
           };
           const onTouchEnd = () => {
-            if (isClosing) return;
-            if (dragY > 100) triggerClose(); 
+            if (dragY > 100) onClose(); 
             else setDragY(0); 
             startY.current = null;
           };
@@ -746,13 +706,14 @@
             if (!client || !amount) return; const raw = parseInt(amount.replace(/,/g, ""), 10); if (isNaN(raw) || raw <= 0) return;
             const [y, m, d] = dateVal.split("-").map(Number);
             onAdd({ client, amount: raw, desc: discount ? "" : desc.trim(), date: new Date(y, m - 1, d, 12).toISOString(), discount });
-            triggerClose();
+            onClose();
           };
           const addC = () => { if (!newName.trim()) return; onNewClient(newName.trim()); setClient(newName.trim()); setNewName(""); setShowNew(false); };
              
           return (
-            <div style={{ ...S.overlay, alignItems: "flex-end", padding: 0, opacity: isMounted && !isClosing ? 1 : 0, transition: "opacity 0.25s ease-out" }} onClick={triggerClose}>
+            <div style={{ ...S.overlay, alignItems: "flex-end", padding: 0 }} onClick={onClose}>
               <div 
+                className="animate-slide" 
                 onClick={(e) => e.stopPropagation()} 
                 onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
                 style={{ 
@@ -761,8 +722,9 @@
                   padding: "28px 24px calc(env(safe-area-inset-bottom) + 30px)", 
                   boxShadow: "0 -10px 40px rgba(0,0,0,0.6)",
                   display: "flex", flexDirection: "column",
-                  transform: isMounted && !isClosing ? `translateY(${dragY}px)` : "translateY(100%)",
-                  transition: dragY > 0 && !isClosing ? "none" : "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)"
+                  // 손가락 위치에 따라 자연스럽게 내려감
+                  transform: dragY > 0 ? `translateY(${dragY}px)` : "translateY(0)",
+                  transition: dragY > 0 ? "none" : "transform 0.2s ease-out"
                 }}
               >
                 <div style={{ width: 56, height: 6, background: "rgba(255,255,255,0.2)", borderRadius: 3, margin: "0 auto 28px" }} />
@@ -813,7 +775,7 @@
           );
         }
           
-        // ─── 실제 동작 앱 컴포넌트 (오류 방지 안전장치 적용) ───
+        // ─── 실제 동작 앱 컴포넌트 ───
         function MainApp({ data, persist, user }) {
           const safeData = sanitizeData(data);
 
@@ -874,12 +836,10 @@
              
           const curMk = mk(vY, vM);
           const monthEntries = safeData.entries.filter((e) => { 
-            if(!e || !e.date) return false;
             const d = new Date(e.date); 
             return d.getFullYear() === vY && d.getMonth() === vM; 
           });
           const unpaidEntries = safeData.entries.filter((e) => { 
-            if(!e || !e.date) return false;
             const d = new Date(e.date); 
             return mk(d.getFullYear(), d.getMonth()) < curMk && !e.paid; 
           });
@@ -896,14 +856,12 @@
             let ent = safeData.entries; let pay = { ...safeData.payments }; const pk = `${key}::${client}`;
             if (check) {
               ent = ent.map((e) => { 
-                if(!e || !e.date) return e;
                 const d = new Date(e.date); 
                 return e.client === client && mk(d.getFullYear(), d.getMonth()) === key ? { ...e, paid: true } : e; 
               });
-              if (unpaidAmt > 0) pay[pk] = unpaidAmt;
+              if (unpaidAmt > 0) pay[pk] = unpaidAmt; 
             } else {
               ent = ent.map((e) => { 
-                if(!e || !e.date) return e;
                 const d = new Date(e.date); 
                 return e.client === client && mk(d.getFullYear(), d.getMonth()) === key ? { ...e, paid: false } : e; 
               });
@@ -913,11 +871,11 @@
           };
              
           const onDelete = (entry) => {
-            const ent = safeData.entries.filter((e) => e && e.id !== entry.id);
+            const ent = safeData.entries.filter((e) => e.id !== entry.id);
             persist({ ...safeData, entries: ent, payments: cleanPay(safeData.payments, new Set(ent.map((e) => e.client))) });
             setDel(null);
           };
-          const onEditAmt = (id, a) => { persist({ ...safeData, entries: safeData.entries.map((e) => (e && e.id === id ? { ...e, amount: a } : e)) }); };
+          const onEditAmt = (id, a) => { persist({ ...safeData, entries: safeData.entries.map((e) => (e.id === id ? { ...e, amount: a } : e)) }); };
              
           const prev = () => { if (vM === 0) { setVY(vY - 1); setVM(11); } else { setVM(vM - 1); } };
           const next = () => { if (vM === 11) { setVY(vY + 1); setVM(0); } else { setVM(vM + 1); } };
@@ -1056,9 +1014,8 @@
           settingMenuBtn: { display: "flex", alignItems: "center", gap: 12, padding: "16px", background: "rgba(255,255,255,0.05)", border: "none", borderRadius: 14, color: "#e0e2eb", fontSize: 16, fontWeight: 700, cursor: "pointer", transition: "0.2s", textAlign: "left", width: "100%" }
         };
 
-        // 앱 최상단에 에러 바운더리 씌우기
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<ErrorBoundary><App /></ErrorBoundary>);
+        root.render(<App />);
     </script>
 </body>
 </html>
