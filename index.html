@@ -327,7 +327,7 @@
           return <div style={{...S.card, padding: "20px 12px", marginBottom: 24}}><div style={S.calGrid}>{cells}</div></div>;
         }
 
-        // ─── ✨ 프리미엄 Invoice 정산서 ✨ ───
+// ─── ✨ 프리미엄 Invoice 정산서 (금액 줄바꿈 방지 적용) ✨ ───
         function ReceiptModal({ client, month, year, items, unpaid, unpaidItems, onClose }) {
           const [isProcessing, setIsProcessing] = useState(false);
           const currentTotal = items.reduce((s, e) => s + amt(e), 0);
@@ -406,7 +406,7 @@
                 {/* 🧾 캡처 영역 시작 */}
                 <div id="receipt-capture-area" style={{ width: "100%", maxWidth: 400, background: "#f6f4ef", padding: "52px 38px 44px", color: "#111", fontFamily: "'Pretendard', -apple-system, sans-serif", minHeight: 520, flexShrink: 0 }}>
                   
-                  {/* ✨ 헤더: ISSUED BY & INVOICE 높이/비율 최적화 적용 */}
+                  {/* 헤더 */}
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 40, borderBottom: "2px solid #111", paddingBottom: 24 }}>
                     <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: 38 }}>
                       <div style={{ fontSize: 10, fontWeight: 800, color: "#888", letterSpacing: "3px" }}>ISSUED BY</div>
@@ -426,12 +426,12 @@
                     </div>
                   </div>
 
-                  {/* ✨ 매트 블랙 토탈 라벨 적용 */}
+                  {/* ✨ 매트 블랙 토탈 라벨 (줄바꿈 방지 적용) */}
                   <div style={{ background: "#111", borderRadius: 12, padding: "24px", marginBottom: 36, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 10px 20px rgba(0,0,0,0.08)" }}>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: "2px" }}>TOTAL DUE</span>
-                    <div style={{ textAlign: "right" }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: "2px", flexShrink: 0 }}>TOTAL DUE</span>
+                    <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 0, marginLeft: 12 }}>
                       <span style={{ fontSize: 30, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>{finalTotal < 0 ? "0" : Math.abs(finalTotal).toLocaleString("ko-KR")}<span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>원</span></span>
-                      {finalTotal < 0 && <div style={{ fontSize: 11, color: "#9ece6a", fontWeight: 800, marginTop: 4 }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}
+                      {finalTotal < 0 && <div style={{ fontSize: 11, color: "#9ece6a", fontWeight: 800, marginTop: 4, whiteSpace: "normal" }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}
                     </div>
                   </div>
 
@@ -452,16 +452,16 @@
                     </tbody>
                   </table>
 
-                  {/* 하단 Total 영역 */}
+                  {/* ✨ 하단 일반 Total 영역 (줄바꿈 방지 적용) */}
                   <div style={{ borderTop: "2px solid #111", borderBottom: "2px solid #111", padding: "16px 0", marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 14, fontWeight: 900, color: "#111", letterSpacing: "1px" }}>TOTAL</span>
-                    <div style={{ textAlign: "right" }}>
+                    <span style={{ fontSize: 14, fontWeight: 900, color: "#111", letterSpacing: "1px", flexShrink: 0 }}>TOTAL</span>
+                    <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 0, marginLeft: 12 }}>
                         <span style={{ fontSize: 22, fontWeight: 900, color: "#111" }}>{finalTotal<0?"0":Math.abs(finalTotal).toLocaleString("ko-KR")}</span>
-                        {finalTotal < 0 && <div style={{ fontSize: 11, color: "#27ae60", fontWeight: 800, marginTop: 2 }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}
+                        {finalTotal < 0 && <div style={{ fontSize: 11, color: "#27ae60", fontWeight: 800, marginTop: 2, whiteSpace: "normal" }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}
                     </div>
                   </div>
 
-                  {/* ✨ 하단 감사 문구 추가 */}
+                  {/* 하단 감사 문구 */}
                   <div style={{ marginTop: 44, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
                     <div style={{ fontSize: 10, color: "#aaa", fontWeight: 700, letterSpacing: "1px" }}>THANK YOU FOR YOUR BUSINESS</div>
                     <div style={{ fontSize: 10, fontWeight: 900, color: "#ccc", letterSpacing: "2px" }}>KIM MINWOO</div>
