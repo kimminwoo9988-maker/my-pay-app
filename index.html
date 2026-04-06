@@ -43,7 +43,7 @@
         // ─── Constants & Helpers ───
         const MONTHS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
         const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
-        const KEY = "freelance-tracker-v22"; 
+        const KEY = "freelance-tracker-v23"; 
         const COLORS = ["#7aa2f7", "#bb9af7", "#9ece6a", "#e0af68", "#f7768e", "#7dcfff", "#ff9e64", "#73daca"];
           
         const id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -212,6 +212,7 @@
           );
         }
 
+        // 업체 목록 관리 여백(Padding) 추가 적용됨
         function ClientManagerModal({ clients, onUpdate, onDelete, onClose }) {
           const [editName, setEditName] = useState(null);
           const [newVal, setNewVal] = useState("");
@@ -663,13 +664,14 @@
                     <input type="checkbox" checked={isFullyPaid} onChange={onCheck} style={{ opacity: 0, position: "absolute", width: 34, height: 34, cursor: "pointer" }} />
                     {isFullyPaid && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f111a" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>}
                   </div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
                     <div style={{ fontSize: 18, fontWeight: 900, color: isFullyPaid ? "#7a84a6" : "#fff", textDecoration: isFullyPaid && total > 0 ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
-                    {unpaid > 0 && <div style={{ fontSize: 13, color: "#e0af68", marginTop: 4, fontWeight: 700 }}>미정산 이월 포함됨</div>}
-                    {unpaid < 0 && <div style={{ fontSize: 13, color: "#9ece6a", marginTop: 4, fontWeight: 700 }}>선지급 차감됨 (+{won(Math.abs(unpaid))})</div>}
+                    {/* 글자 크기를 줄이고 줄바꿈을 방지한 부분 */}
+                    {unpaid > 0 && <div style={{ fontSize: 11.5, color: "#e0af68", marginTop: 4, fontWeight: 700, whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>미정산 이월 포함됨</div>}
+                    {unpaid < 0 && <div style={{ fontSize: 11.5, color: "#9ece6a", marginTop: 4, fontWeight: 700, whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>선지급 차감됨 (+{won(Math.abs(unpaid))})</div>}
                   </div>
                 </label>
-                <div style={{ flexShrink: 0, paddingLeft: 10, textAlign: "right" }}>
+                <div style={{ flexShrink: 0, textAlign: "right" }}>
                   <span style={{ fontSize: 22, fontWeight: 900, color: isFullyPaid ? "#7a84a6" : "#7aa2f7", textDecoration: isFullyPaid && total > 0 ? "line-through" : "none" }}>
                     {total < 0 ? `-${won(Math.abs(total))}` : won(total)}
                   </span>
@@ -679,7 +681,7 @@
               {paidAmt > 0 && (
                 <div className="animate-fade" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 16, borderTop: "1px dashed rgba(255,255,255,0.1)" }}>
                   {endUnpaid < 0 ? (
-                    <span style={{ fontSize: 15, color: "#9ece6a", fontWeight: 800 }}>정산 후 남은 금액(선지급) +{won(Math.abs(endUnpaid))}</span>
+                    <span style={{ fontSize: 15, color: "#9ece6a", fontWeight: 800 }}>정산 후 남은 금액(선지급): +{won(Math.abs(endUnpaid))}</span>
                   ) : (
                     <span style={{ fontSize: 15, color: isFullyPaid ? "#7aa2f7" : "#9ece6a", fontWeight: 800 }}>누적 입금: {won(paidAmt)}</span>
                   )}
@@ -707,32 +709,41 @@
           );
         }
           
-        // ─── 부드러운 스와이프 다운 (Drag to Dismiss) ───
+        // ─── 부드러운 스와이프 다운 (DOM 직접 제어로 완벽 적용) ───
         function BottomSheetForm({ clients, onAdd, onNewClient, onClose }) {
           const [client, setClient] = useState(""); const [amount, setAmount] = useState(""); const [desc, setDesc] = useState("");
           const [dateVal, setDateVal] = useState(today()); const [discount, setDiscount] = useState(false);
           const [showNew, setShowNew] = useState(false); const [newName, setNewName] = useState("");
           const [isSubmitting, setIsSubmitting] = useState(false);
               
-          const [dragY, setDragY] = useState(0);
+          const sheetRef = useRef(null);
           const startY = useRef(null);
+          const currentY = useRef(0);
          
           const onTouchStart = (e) => { 
-             // 입력 필드와 버튼 외의 공간을 터치했을 때만 스와이프 활성화
-             if(['input', 'select', 'button'].includes(e.target.tagName.toLowerCase())) return;
+             // 입력창 제어 방해 안 받게
+             if(e.target.closest('input, select, button')) return;
              startY.current = e.touches[0].clientY; 
+             if(sheetRef.current) sheetRef.current.style.transition = 'none';
           };
           const onTouchMove = (e) => {
             if (startY.current === null) return;
             const diff = e.touches[0].clientY - startY.current;
             if (diff > 0) {
-              e.preventDefault(); // 스와이프 중 모바일 브라우저의 기본 새로고침/스크롤 동작 방지
-              setDragY(diff);
+              currentY.current = diff;
+              if(sheetRef.current) sheetRef.current.style.transform = `translateY(${diff}px)`;
             }
           };
           const onTouchEnd = () => {
-            if (dragY > 60) onClose(); 
-            else setDragY(0); 
+            if (currentY.current > 80) {
+              onClose(); 
+            } else {
+              if(sheetRef.current) {
+                 sheetRef.current.style.transition = 'transform 0.2s ease-out';
+                 sheetRef.current.style.transform = 'translateY(0)';
+              }
+              currentY.current = 0;
+            }
             startY.current = null;
           };
               
@@ -756,6 +767,7 @@
           return (
             <div style={{ ...S.overlay, alignItems: "flex-end", padding: 0 }} onClick={onClose}>
               <div 
+                ref={sheetRef}
                 className="animate-slide" 
                 onClick={(e) => e.stopPropagation()} 
                 onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
@@ -765,9 +777,7 @@
                   padding: "0 24px calc(env(safe-area-inset-bottom) + 30px)", 
                   boxShadow: "0 -10px 40px rgba(0,0,0,0.6)",
                   display: "flex", flexDirection: "column",
-                  touchAction: "none", 
-                  transform: dragY > 0 ? `translateY(${dragY}px)` : "translateY(0)",
-                  transition: dragY > 0 ? "none" : "transform 0.2s ease-out"
+                  willChange: "transform"
                 }}
               >
                 <div style={{ width: "100%", padding: "16px 0 24px", display: "flex", justifyContent: "center" }}>
