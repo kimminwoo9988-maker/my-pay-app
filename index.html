@@ -327,13 +327,18 @@
           return <div style={{...S.card, padding: "20px 12px", marginBottom: 24}}><div style={S.calGrid}>{cells}</div></div>;
         }
 
-// ─── ✨ 프리미엄 Invoice 정산서 (금액 줄바꿈 방지 적용) ✨ ───
+// ─── ✨ 프리미엄 Invoice 정산서 (금액 폰트 자동 조절 및 잘림 방지 반영) ✨ ───
         function ReceiptModal({ client, month, year, items, unpaid, unpaidItems, onClose }) {
           const [isProcessing, setIsProcessing] = useState(false);
           const currentTotal = items.reduce((s, e) => s + amt(e), 0);
           const finalTotal = currentTotal + unpaid;
           const d = new Date();
           const todayStr = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")}`;
+
+          // ✨ 금액 길이에 따라 폰트 크기를 자동으로 줄여주는 로직 (원 글자 잘림 방지)
+          const finalTotalStr = finalTotal < 0 ? "0" : Math.abs(finalTotal).toLocaleString("ko-KR");
+          const dueFontSize = finalTotalStr.length > 11 ? 20 : finalTotalStr.length > 8 ? 24 : 30;
+          const totalFontSize = finalTotalStr.length > 11 ? 16 : finalTotalStr.length > 8 ? 18 : 22;
 
           const copyText = async () => {
             const lines = [`[${year}년 ${month+1}월] ${client}`, "", ...items.map(e => `- ${tag(e)} : ${e.discount?"-":""}${won(e.amount)}`)];
@@ -426,11 +431,11 @@
                     </div>
                   </div>
 
-                  {/* ✨ 매트 블랙 토탈 라벨 (줄바꿈 방지 적용) */}
+                  {/* ✨ 매트 블랙 토탈 라벨 (동적 폰트 사이즈 적용) */}
                   <div style={{ background: "#111", borderRadius: 12, padding: "24px", marginBottom: 36, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 10px 20px rgba(0,0,0,0.08)" }}>
                     <span style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: "2px", flexShrink: 0 }}>TOTAL DUE</span>
-                    <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 0, marginLeft: 12 }}>
-                      <span style={{ fontSize: 30, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>{finalTotal < 0 ? "0" : Math.abs(finalTotal).toLocaleString("ko-KR")}<span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>원</span></span>
+                    <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 1, minWidth: 0, marginLeft: 12 }}>
+                      <span style={{ fontSize: dueFontSize, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>{finalTotalStr}<span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>원</span></span>
                       {finalTotal < 0 && <div style={{ fontSize: 11, color: "#9ece6a", fontWeight: 800, marginTop: 4, whiteSpace: "normal" }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}
                     </div>
                   </div>
@@ -452,11 +457,11 @@
                     </tbody>
                   </table>
 
-                  {/* ✨ 하단 일반 Total 영역 (줄바꿈 방지 적용) */}
+                  {/* ✨ 하단 일반 Total 영역 (동적 폰트 사이즈 적용) */}
                   <div style={{ borderTop: "2px solid #111", borderBottom: "2px solid #111", padding: "16px 0", marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 14, fontWeight: 900, color: "#111", letterSpacing: "1px", flexShrink: 0 }}>TOTAL</span>
-                    <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 0, marginLeft: 12 }}>
-                        <span style={{ fontSize: 22, fontWeight: 900, color: "#111" }}>{finalTotal<0?"0":Math.abs(finalTotal).toLocaleString("ko-KR")}</span>
+                    <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 1, minWidth: 0, marginLeft: 12 }}>
+                        <span style={{ fontSize: totalFontSize, fontWeight: 900, color: "#111" }}>{finalTotalStr}</span>
                         {finalTotal < 0 && <div style={{ fontSize: 11, color: "#27ae60", fontWeight: 800, marginTop: 2, whiteSpace: "normal" }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}
                     </div>
                   </div>
