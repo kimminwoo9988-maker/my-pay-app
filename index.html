@@ -188,6 +188,7 @@
         }
 
         // ─── ✨ 프리미엄 Invoice 정산서 ───
+// ─── ✨ 프리미엄 Invoice 정산서 (스크롤 버그 수정본) ───
         function ReceiptModal({ client, month, year, items, unpaid, unpaidItems, onClose }) {
           const [isProcessing, setIsProcessing] = useState(false);
           const currentTotal = items.reduce((s, e) => s + amt(e), 0);
@@ -231,8 +232,7 @@
           return (
             // 변경된 부분: alignItems를 flex-start로 변경하여 상단이 잘리지 않게 하고, 부모 영역 전체가 스크롤되도록 설정했습니다.
             <div style={{ ...S.overlay, alignItems: "flex-start", overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "40px 24px" }} onClick={onClose}>
-              
-              // 변경된 부분: maxHeight를 없애고 margin: "auto"를 주어, 내용이 짧을 땐 중앙에, 길 땐 전체가 자연스럽게 늘어나며 스크롤되도록 했습니다.
+            
               <div className="animate-pop" onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, margin: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
                 
                 <div id="receipt-capture-area" style={{ background: "#f6f4ef", padding: "52px 38px 44px", color: "#111", fontFamily: "'Pretendard', -apple-system, sans-serif", minHeight: 520 }}>
@@ -283,6 +283,7 @@
             </div>
           );
         }
+        
         // ─── [수정2] SummaryTab에 allEntries prop 추가 ───
         function SummaryTab({ entries, unpaidMap, year, month, onDelete, onEditEntry, allEntries }) {
           const [selDay, setSelDay] = useState(null); const [openClient, setOpenClient] = useState(null); const [receiptClient, setReceiptClient] = useState(null);
