@@ -43,7 +43,7 @@
         // ─── Constants & Helpers ───
         const MONTHS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
         const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
-        const KEY = "freelance-tracker-v19"; 
+        const KEY = "freelance-tracker-v20"; 
         const COLORS = ["#7aa2f7", "#bb9af7", "#9ece6a", "#e0af68", "#f7768e", "#7dcfff", "#ff9e64", "#73daca"];
           
         const id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -617,7 +617,9 @@
             const paidAmt = (payments && payments[`${monthKey}::${client}`]) || 0;
             
             const done = (items.length === 0 || paid) && endUnpaid <= 0;
-            return { client, items, thisTotal, unpaid, total, paid, paidAmt, done };
+            const isFullyPaid = done || (total > 0 && paidAmt >= total) || endUnpaid <= 0;
+            
+            return { client, items, thisTotal, unpaid, total, paid, paidAmt, endUnpaid, isFullyPaid };
           }).filter(Boolean);
               
           const totalDue = rows.reduce((s, r) => s + r.total, 0);
@@ -640,29 +642,29 @@
               </div>
               
               {rows.map((r) => (
-                <PayRow key={r.client} {...r} onCheck={() => onFullCheck(r.client, monthKey, !r.done)} onPay={(a) => onPartialPay(r.client, monthKey, a)} onReset={() => onResetPay(r.client)} />
+                <PayRow key={r.client} {...r} onCheck={() => onFullCheck(r.client, monthKey, !r.isFullyPaid)} onPay={(a) => onPartialPay(r.client, monthKey, a)} onReset={() => onResetPay(r.client)} />
               ))}
             </div>
           );
         }
           
-        function PayRow({ client, total, thisTotal, unpaid, done, paidAmt, items, onCheck, onPay, onReset }) {
+        function PayRow({ client, total, thisTotal, unpaid, isFullyPaid, paidAmt, endUnpaid, items, onCheck, onPay, onReset }) {
           const [open, setOpen] = useState(false);
           const [val, setVal] = useState("");
           const go = () => { const r = parseInt(val.replace(/,/g, ""), 10); if (!isNaN(r) && r > 0) { onPay(r); setVal(""); setOpen(false); } };
               
           return (
-            <div style={{ background: done ? "rgba(26, 27, 38, 0.5)" : "rgba(36, 40, 59, 0.9)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: done ? 0.6 : 1 }}>
+            <div style={{ background: isFullyPaid ? "rgba(26, 27, 38, 0.5)" : "rgba(36, 40, 59, 0.9)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: isFullyPaid ? 0.6 : 1 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 16, cursor: "pointer", flex: 1 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: done ? "#9ece6a" : "rgba(0,0,0,0.3)", border: done ? "none" : "2px solid #565f89", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s", flexShrink: 0 }}>
-                    <input type="checkbox" checked={done} onChange={onCheck} style={{ opacity: 0, position: "absolute", width: 34, height: 34, cursor: "pointer" }} />
-                    {done && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f111a" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>}
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: isFullyPaid ? "#9ece6a" : "rgba(0,0,0,0.3)", border: isFullyPaid ? "none" : "2px solid #565f89", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s", flexShrink: 0 }}>
+                    <input type="checkbox" checked={isFullyPaid} onChange={onCheck} style={{ opacity: 0, position: "absolute", width: 34, height: 34, cursor: "pointer" }} />
+                    {isFullyPaid && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f111a" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>}
                   </div>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 18, fontWeight: 900, color: done ? "#7a84a6" : "#fff", textDecoration: done && total > 0 ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
+                    <div style={{ fontSize: 18, fontWeight: 900, color: isFullyPaid ? "#7a84a6" : "#fff", textDecoration: isFullyPaid && total > 0 ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
                     {unpaid > 0 && <div style={{ fontSize: 13, color: "#e0af68", marginTop: 4, fontWeight: 700 }}>이전 달 미정산 합산됨</div>}
-                    {unpaid < 0 && <div style={{ fontSize: 13, color: "#9ece6a", marginTop: 4, fontWeight: 700 }}>이전 달 선 지급 차감됨</div>}
+                    {unpaid < 0 && <div style={{ fontSize: 13, color: "#9ece6a", marginTop: 4, fontWeight: 700 }}>이전 달 선 지급 차감됨 (+{won(Math.abs(unpaid))})</div>}
                   </div>
                 </label>
                 <div style={{ flexShrink: 0, paddingLeft: 10, textAlign: "right" }}>
@@ -672,19 +674,23 @@
                       <div style={{ fontSize: 18, fontWeight: 900, color: "#9ece6a" }}>+{won(Math.abs(total))}</div>
                     </>
                   ) : (
-                    <span style={{ fontSize: 22, fontWeight: 900, color: done ? "#7a84a6" : "#7aa2f7", textDecoration: done ? "line-through" : "none" }}>{won(total)}</span>
+                    <span style={{ fontSize: 22, fontWeight: 900, color: isFullyPaid ? "#7a84a6" : "#7aa2f7", textDecoration: isFullyPaid ? "line-through" : "none" }}>{won(total)}</span>
                   )}
                 </div>
               </div>
               
-              {paidAmt > 0 && !done && (
+              {paidAmt > 0 && (
                 <div className="animate-fade" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 16, borderTop: "1px dashed rgba(255,255,255,0.1)" }}>
-                  <span style={{ fontSize: 15, color: "#9ece6a", fontWeight: 800 }}>누적 입금: {won(paidAmt)}</span>
+                  {endUnpaid < 0 ? (
+                    <span style={{ fontSize: 15, color: "#9ece6a", fontWeight: 800 }}>정산 후 남은 금액(선지급) +{won(Math.abs(endUnpaid))}</span>
+                  ) : (
+                    <span style={{ fontSize: 15, color: isFullyPaid ? "#7aa2f7" : "#9ece6a", fontWeight: 800 }}>누적 입금: {won(paidAmt)}</span>
+                  )}
                   <button onClick={onReset} style={{ background: "rgba(231, 76, 60, 0.15)", border: "none", borderRadius: 10, color: "#e74c3c", fontSize: 13, fontWeight: 800, padding: "8px 14px", cursor: "pointer" }}>취소</button>
                 </div>
               )}
               
-              {!done && (
+              {!isFullyPaid && (
                 <div style={{ marginTop: 16 }}>
                   {!open ? (
                     <button onClick={() => setOpen(true)} style={S.partialBtn}>+ 분할 입금액 추가</button>
@@ -709,13 +715,13 @@
           const [client, setClient] = useState(""); const [amount, setAmount] = useState(""); const [desc, setDesc] = useState("");
           const [dateVal, setDateVal] = useState(today()); const [discount, setDiscount] = useState(false);
           const [showNew, setShowNew] = useState(false); const [newName, setNewName] = useState("");
+          const [isSubmitting, setIsSubmitting] = useState(false);
               
           const [dragY, setDragY] = useState(0);
           const startY = useRef(null);
          
-          // 전체 창 어디서든 터치 스와이프가 작동하도록 수정
+          // 입력창 터치 시 스와이프 차단하여 정상적으로 입력 가능하게 처리
           const onTouchStart = (e) => { 
-             // 입력창 내부를 터치한 경우는 드래그 무시 (스크롤 방해 방지)
              if(e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'select') return;
              startY.current = e.touches[0].clientY; 
           };
@@ -731,10 +737,19 @@
           };
               
           const submit = () => {
-            if (!client || !amount) return; const raw = parseInt(amount.replace(/,/g, ""), 10); if (isNaN(raw) || raw <= 0) return;
+            if (isSubmitting) return; 
+            if (!client || !amount) return; 
+            const raw = parseInt(amount.replace(/,/g, ""), 10); 
+            if (isNaN(raw) || raw <= 0) return;
+            
+            setIsSubmitting(true);
             const [y, m, d] = dateVal.split("-").map(Number);
             onAdd({ client, amount: raw, desc: discount ? "" : desc.trim(), date: new Date(y, m - 1, d, 12).toISOString(), discount });
-            onClose();
+            
+            setTimeout(() => {
+                setIsSubmitting(false);
+                onClose();
+            }, 100);
           };
           const addC = () => { if (!newName.trim()) return; onNewClient(newName.trim()); setClient(newName.trim()); setNewName(""); setShowNew(false); };
               
@@ -750,7 +765,7 @@
                   padding: "0 24px calc(env(safe-area-inset-bottom) + 30px)", 
                   boxShadow: "0 -10px 40px rgba(0,0,0,0.6)",
                   display: "flex", flexDirection: "column",
-                  touchAction: "pan-x", // 세로 스크롤만 막고 부드럽게 끌어내려지도록 처리
+                  touchAction: "pan-x", // 모바일 기본 스크롤(새로고침)과 충돌하지 않도록 수정
                   transform: dragY > 0 ? `translateY(${dragY}px)` : "translateY(0)",
                   transition: dragY > 0 ? "none" : "transform 0.2s ease-out"
                 }}
@@ -798,7 +813,7 @@
                   {!discount && <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="작업 내용 (선택)" style={{ ...S.input, flex: 1, minWidth: 0 }} onKeyDown={(e) => e.key === "Enter" && submit()} />}
                 </div>
               
-                <button onClick={submit} disabled={!client || !amount} style={{ ...S.submitBtn, opacity: client && amount ? 1 : 0.3, background: discount ? "linear-gradient(135deg, #f7768e 0%, #ff9e64 100%)" : "linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%)", width: "100%" }}>
+                <button onClick={submit} disabled={!client || !amount || isSubmitting} style={{ ...S.submitBtn, opacity: client && amount ? 1 : 0.3, background: discount ? "linear-gradient(135deg, #f7768e 0%, #ff9e64 100%)" : "linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%)", width: "100%" }}>
                   {discount ? "할인 내역 저장" : "기록 저장하기"}
                 </button>
               </div>
@@ -831,7 +846,6 @@
         function MainApp({ data, persist, user }) {
           const safeData = sanitizeData(data);
 
-          // 앱 최초 실행 시: 비밀번호가 없으면 무조건 "setup"(설정) 화면으로 진입
           const [pinState, setPinState] = useState(safeData.pin ? "verify" : "setup");
           const [vY, setVY] = useState(() => new Date().getFullYear());
           const [vM, setVM] = useState(() => new Date().getMonth());
@@ -841,7 +855,6 @@
           const [showClientManager, setShowClientManager] = useState(false);
           const [showSettings, setShowSettings] = useState(false);
               
-          // iOS 백그라운드 전환 및 브라우저 화면 숨김 감지 (완벽한 잠금 처리)
           useEffect(() => {
             const lockApp = () => {
               if (safeData.pin) setPinState("verify");
@@ -852,7 +865,6 @@
             };
             
             document.addEventListener("visibilitychange", handleVisibilityChange);
-            // iOS 사파리 및 PWA의 백그라운드 전환 이벤트를 완벽히 잡기 위해 pagehide 추가
             window.addEventListener("pagehide", lockApp);
             
             return () => {
@@ -947,7 +959,6 @@
           };
           const onEditAmt = (id, a) => { persist({ ...safeData, entries: safeData.entries.map((e) => (e.id === id ? { ...e, amount: a } : e)) }); };
           
-          // ✨ 데이터 완전 초기화 후 곧바로 비밀번호 설정 화면(setup)으로 강제 전환
           const onResetData = () => {
              persist({ entries: [], clients: [], payments: {}, pin: null });
              setPinState("setup"); 
