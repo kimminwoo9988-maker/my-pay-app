@@ -43,7 +43,7 @@
         // ─── Constants & Helpers ───
         const MONTHS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
         const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
-        const KEY = "freelance-tracker-v23"; 
+        const KEY = "freelance-tracker-v24"; 
         const COLORS = ["#7aa2f7", "#bb9af7", "#9ece6a", "#e0af68", "#f7768e", "#7dcfff", "#ff9e64", "#73daca"];
           
         const id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -212,7 +212,6 @@
           );
         }
 
-        // 업체 목록 관리 여백(Padding) 추가 적용됨
         function ClientManagerModal({ clients, onUpdate, onDelete, onClose }) {
           const [editName, setEditName] = useState(null);
           const [newVal, setNewVal] = useState("");
@@ -248,7 +247,6 @@
           );
         }
 
-        // 설정 모달
         function SettingsModal({ onChangePin, onManageClients, onResetData, onLogout, onClose }) {
           return (
             <div style={S.overlay} onClick={onClose}>
@@ -308,30 +306,36 @@
           );
         }
           
+        // ─── ✨ 통합된 총 합계 계산 ───
         function TotalDashboard({ current, unpaidMap }) {
           let sumUnpaid = 0; let sumPrepaid = 0;
           Object.values(unpaidMap || {}).forEach(v => {
             if (v > 0) sumUnpaid += v;
             else if (v < 0) sumPrepaid += Math.abs(v);
           });
+          
+          // 메인 합계 = 이번달 작업 + 미정산금 - 선지급금
+          const finalTotal = (current || 0) + sumUnpaid - sumPrepaid;
 
           return (
             <div style={{ ...S.card, padding: "26px 20px", marginBottom: 24, background: "linear-gradient(145deg, #1f2233 0%, #161824 100%)", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
               <span style={{ fontSize: 14, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>이번 달 총 합계</span>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                <span style={{ fontSize: 34, fontWeight: 900, color: "#fff", letterSpacing: "-1px" }}>{(current||0).toLocaleString("ko-KR")}</span>
-                <span style={{ fontSize: 18, fontWeight: 700, color: "#7aa2f7" }}>원</span>
+                <span style={{ fontSize: 34, fontWeight: 900, color: finalTotal < 0 ? "#f7768e" : "#fff", letterSpacing: "-1px" }}>
+                  {finalTotal < 0 ? "-" : ""}{Math.abs(finalTotal).toLocaleString("ko-KR")}
+                </span>
+                <span style={{ fontSize: 18, fontWeight: 700, color: finalTotal < 0 ? "#f7768e" : "#7aa2f7" }}>원</span>
               </div>
               {sumUnpaid > 0 && (
                 <div style={{ marginTop: 10, padding: "6px 14px", background: "rgba(224, 175, 104, 0.15)", borderRadius: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 13, color: "#e0af68", fontWeight: 700 }}>+ 미정산 이월</span>
+                  <span style={{ fontSize: 13, color: "#e0af68", fontWeight: 700 }}>미정산 이월</span>
                   <span style={{ fontSize: 14, color: "#e0af68", fontWeight: 900 }}>{sumUnpaid.toLocaleString("ko-KR")}원</span>
                 </div>
               )}
               {sumPrepaid > 0 && (
                 <div style={{ marginTop: sumUnpaid > 0 ? 6 : 10, padding: "6px 14px", background: "rgba(158, 206, 106, 0.15)", borderRadius: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 13, color: "#9ece6a", fontWeight: 700 }}>+ 선지급 누적</span>
-                  <span style={{ fontSize: 14, color: "#9ece6a", fontWeight: 900 }}>{sumPrepaid.toLocaleString("ko-KR")}원</span>
+                  <span style={{ fontSize: 13, color: "#9ece6a", fontWeight: 700 }}>선지급 차감됨</span>
+                  <span style={{ fontSize: 14, color: "#9ece6a", fontWeight: 900 }}>-{sumPrepaid.toLocaleString("ko-KR")}원</span>
                 </div>
               )}
             </div>
@@ -467,6 +471,7 @@
                     </button>
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>
+                    {/* 텍스트 복사와 닫기 버튼 크기 1:1로 수정 */}
                     <button onClick={copyText} style={{ flex: 1, padding: "14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 14, color: "#e0e2eb", fontWeight: 800, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "0.2s" }} onPointerDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")} onPointerUp={(e) => (e.currentTarget.style.transform = "scale(1)")}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> 텍스트 복사
                     </button>
@@ -479,12 +484,15 @@
         }
           
         // ─── Main Tabs ───
-        function SummaryTab({ entries, unpaidMap, year, month, onDelete, onEditAmount }) {
+        function SummaryTab({ entries, unpaidMap, year, month, onDelete, onEditEntry }) {
           const [selDay, setSelDay] = useState(null);
           const [openClient, setOpenClient] = useState(null);
           const [receiptClient, setReceiptClient] = useState(null);
+          
+          // ✨ 수정 기능 상태 변수 (금액 + 내용 모두 수정)
           const [editId, setEditId] = useState(null);
-          const [editVal, setEditVal] = useState("");
+          const [editAmt, setEditAmt] = useState("");
+          const [editDesc, setEditDesc] = useState("");
               
           const groups = {};
           (entries || []).forEach((e) => {
@@ -494,7 +502,11 @@
           const grandTotal = (entries || []).reduce((s, e) => s + amt(e), 0);
           const allClients = [...new Set([...Object.keys(groups), ...Object.keys(unpaidMap || {})])];
               
-          const doEdit = (e) => { const r = parseInt(editVal.replace(/,/g, ""), 10); if (!isNaN(r) && r > 0) onEditAmount(e.id, r); setEditId(null); };
+          const doEdit = (e) => { 
+            const r = parseInt(editAmt.replace(/,/g, ""), 10); 
+            if (!isNaN(r) && r > 0) onEditEntry(e.id, r, editDesc); 
+            setEditId(null); 
+          };
               
           return (
             <div className="animate-fade">
@@ -552,17 +564,19 @@
                           {items.map((e) => (
                             <div key={e.id} style={{ padding: "14px 0", borderBottom: "1px dashed rgba(255,255,255,0.1)" }}>
                               {editId === e.id ? (
-                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                  <span style={{ fontSize: 15, color: e.discount ? "#f7768e" : "#a9b1d6", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tag(e)}</span>
-                                  <input value={editVal} onChange={(ev) => setEditVal(fmt(ev.target.value))} inputMode="numeric" autoFocus onKeyDown={(ev) => { if (ev.key === "Enter") doEdit(e); if (ev.key === "Escape") setEditId(null); }} style={{ width: 110, padding: "10px", background: "rgba(0,0,0,0.4)", border: "1px solid #7aa2f7", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 800, textAlign: "right", outline: "none", minWidth: 0 }} />
-                                  <button onClick={() => doEdit(e)} style={{ padding: "10px 16px", background: "#7aa2f7", border: "none", borderRadius: 10, color: "#0f111a", fontSize: 14, fontWeight: 900, flexShrink: 0 }}>확인</button>
+                                // ✨ 수정 화면: 내용과 금액 둘 다 수정 가능
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%" }}>
+                                  <input value={editDesc} onChange={(ev) => setEditDesc(ev.target.value)} placeholder="내용" style={{ flex: 1, padding: "10px", background: "rgba(0,0,0,0.4)", border: "1px solid #7aa2f7", borderRadius: 10, color: "#fff", fontSize: 14, minWidth: 0 }} />
+                                  <input value={editAmt} onChange={(ev) => setEditAmt(fmt(ev.target.value))} inputMode="numeric" style={{ width: 85, padding: "10px", background: "rgba(0,0,0,0.4)", border: "1px solid #7aa2f7", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 800, textAlign: "right", minWidth: 0 }} onKeyDown={(ev) => { if (ev.key === "Enter") doEdit(e); if (ev.key === "Escape") setEditId(null); }} />
+                                  <button onClick={() => doEdit(e)} style={{ padding: "10px 14px", background: "#7aa2f7", border: "none", borderRadius: 10, color: "#0f111a", fontSize: 14, fontWeight: 900, flexShrink: 0 }}>확인</button>
                                 </div>
                               ) : (
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                   <span style={{ fontSize: 15, fontWeight: 600, color: e.discount ? "#f7768e" : "#c0caf5" }}>{tag(e)}</span>
                                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                     <span style={{ fontSize: 16, fontWeight: 800, color: e.discount ? "#f7768e" : "#fff" }}>{e.discount ? "-" : ""}{won(e.amount)}</span>
-                                    <button onClick={() => { setEditId(e.id); setEditVal(e.amount.toLocaleString("ko-KR")); }} style={S.editBtn}>수정</button>
+                                    {/* 수정 버튼 누를 때 상태값 설정 */}
+                                    <button onClick={() => { setEditId(e.id); setEditAmt(e.amount.toLocaleString("ko-KR")); setEditDesc(e.desc || ""); }} style={S.editBtn}>수정</button>
                                     <button onClick={() => onDelete(e)} style={S.delBtn}>✕</button>
                                   </div>
                                 </div>
@@ -666,9 +680,9 @@
                   </div>
                   <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
                     <div style={{ fontSize: 18, fontWeight: 900, color: isFullyPaid ? "#7a84a6" : "#fff", textDecoration: isFullyPaid && total > 0 ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
-                    {/* 글자 크기를 줄이고 줄바꿈을 방지한 부분 */}
-                    {unpaid > 0 && <div style={{ fontSize: 11.5, color: "#e0af68", marginTop: 4, fontWeight: 700, whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>미정산 이월 포함됨</div>}
-                    {unpaid < 0 && <div style={{ fontSize: 11.5, color: "#9ece6a", marginTop: 4, fontWeight: 700, whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>선지급 차감됨 (+{won(Math.abs(unpaid))})</div>}
+                    {/* ✨ 텍스트 크기를 더 작게 조정하여 줄바꿈 현상 방지 */}
+                    {unpaid > 0 && <div style={{ fontSize: 11, color: "#e0af68", marginTop: 4, fontWeight: 700, whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>미정산 이월 포함됨</div>}
+                    {unpaid < 0 && <div style={{ fontSize: 11, color: "#9ece6a", marginTop: 4, fontWeight: 700, whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>선지급 차감됨 (+{won(Math.abs(unpaid))})</div>}
                   </div>
                 </label>
                 <div style={{ flexShrink: 0, textAlign: "right" }}>
@@ -681,11 +695,11 @@
               {paidAmt > 0 && (
                 <div className="animate-fade" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 16, borderTop: "1px dashed rgba(255,255,255,0.1)" }}>
                   {endUnpaid < 0 ? (
-                    <span style={{ fontSize: 15, color: "#9ece6a", fontWeight: 800 }}>정산 후 남은 금액(선지급): +{won(Math.abs(endUnpaid))}</span>
+                    <span style={{ fontSize: 13, color: "#9ece6a", fontWeight: 800, whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>정산 후 남은 금액(선지급) +{won(Math.abs(endUnpaid))}</span>
                   ) : (
-                    <span style={{ fontSize: 15, color: isFullyPaid ? "#7aa2f7" : "#9ece6a", fontWeight: 800 }}>누적 입금: {won(paidAmt)}</span>
+                    <span style={{ fontSize: 14, color: isFullyPaid ? "#7aa2f7" : "#9ece6a", fontWeight: 800 }}>누적 입금: {won(paidAmt)}</span>
                   )}
-                  <button onClick={onReset} style={{ background: "rgba(231, 76, 60, 0.15)", border: "none", borderRadius: 10, color: "#e74c3c", fontSize: 13, fontWeight: 800, padding: "8px 14px", cursor: "pointer" }}>취소</button>
+                  <button onClick={onReset} style={{ background: "rgba(231, 76, 60, 0.15)", border: "none", borderRadius: 10, color: "#e74c3c", fontSize: 13, fontWeight: 800, padding: "8px 14px", cursor: "pointer", flexShrink: 0 }}>취소</button>
                 </div>
               )}
               
@@ -709,7 +723,7 @@
           );
         }
           
-        // ─── 부드러운 스와이프 다운 (DOM 직접 제어로 완벽 적용) ───
+        // ─── ✨ 완벽하게 작동하는 DOM 제어 스와이프 다운 ───
         function BottomSheetForm({ clients, onAdd, onNewClient, onClose }) {
           const [client, setClient] = useState(""); const [amount, setAmount] = useState(""); const [desc, setDesc] = useState("");
           const [dateVal, setDateVal] = useState(today()); const [discount, setDiscount] = useState(false);
@@ -720,32 +734,52 @@
           const startY = useRef(null);
           const currentY = useRef(0);
          
-          const onTouchStart = (e) => { 
-             // 입력창 제어 방해 안 받게
-             if(e.target.closest('input, select, button')) return;
-             startY.current = e.touches[0].clientY; 
-             if(sheetRef.current) sheetRef.current.style.transition = 'none';
-          };
-          const onTouchMove = (e) => {
-            if (startY.current === null) return;
-            const diff = e.touches[0].clientY - startY.current;
-            if (diff > 0) {
-              currentY.current = diff;
-              if(sheetRef.current) sheetRef.current.style.transform = `translateY(${diff}px)`;
-            }
-          };
-          const onTouchEnd = () => {
-            if (currentY.current > 80) {
-              onClose(); 
-            } else {
-              if(sheetRef.current) {
-                 sheetRef.current.style.transition = 'transform 0.2s ease-out';
-                 sheetRef.current.style.transform = 'translateY(0)';
-              }
-              currentY.current = 0;
-            }
-            startY.current = null;
-          };
+          useEffect(() => {
+            document.body.style.overflow = "hidden"; // 배경 스크롤 및 튕김 방지
+            
+            const sheet = sheetRef.current;
+            if (!sheet) return;
+            
+            const handleTouchStart = (e) => {
+                // 입력창 터치 시에는 무시
+                if(e.target.closest('input, select, button')) return;
+                startY.current = e.touches[0].clientY;
+                sheet.style.transition = 'none';
+            };
+            
+            const handleTouchMove = (e) => {
+                if (startY.current === null) return;
+                const diff = e.touches[0].clientY - startY.current;
+                if (diff > 0) {
+                    e.preventDefault(); // 스크롤 튕김 원천 차단
+                    currentY.current = diff;
+                    sheet.style.transform = `translateY(${diff}px)`;
+                }
+            };
+            
+            const handleTouchEnd = () => {
+                if (currentY.current > 80) { // 80px 이상 내렸을 때 닫기
+                    onClose();
+                } else { // 덜 내렸으면 제자리 복귀
+                    sheet.style.transition = 'transform 0.2s ease-out';
+                    sheet.style.transform = 'translateY(0)';
+                    currentY.current = 0;
+                }
+                startY.current = null;
+            };
+
+            // passive: false를 주어 확실히 스크롤 이벤트를 잡습니다.
+            sheet.addEventListener('touchstart', handleTouchStart, { passive: false });
+            sheet.addEventListener('touchmove', handleTouchMove, { passive: false });
+            sheet.addEventListener('touchend', handleTouchEnd);
+
+            return () => {
+                document.body.style.overflow = "";
+                sheet.removeEventListener('touchstart', handleTouchStart);
+                sheet.removeEventListener('touchmove', handleTouchMove);
+                sheet.removeEventListener('touchend', handleTouchEnd);
+            };
+          }, [onClose]);
               
           const submit = () => {
             if (isSubmitting) return; 
@@ -770,7 +804,6 @@
                 ref={sheetRef}
                 className="animate-slide" 
                 onClick={(e) => e.stopPropagation()} 
-                onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
                 style={{ 
                   background: "#1a1b26", width: "100%", maxWidth: 480, 
                   borderTopLeftRadius: 36, borderTopRightRadius: 36, 
@@ -971,7 +1004,11 @@
             persist({ ...safeData, entries: ent, payments: cleanPay(safeData.payments, new Set(ent.map((e) => e.client))) });
             setDel(null);
           };
-          const onEditAmt = (id, a) => { persist({ ...safeData, entries: safeData.entries.map((e) => (e.id === id ? { ...e, amount: a } : e)) }); };
+          
+          // ✨ 금액과 설명(내용)을 동시에 업데이트
+          const onEditEntry = (id, amt, desc) => { 
+            persist({ ...safeData, entries: safeData.entries.map((e) => (e.id === id ? { ...e, amount: amt, desc: desc } : e)) }); 
+          };
           
           const onResetData = () => {
              persist({ entries: [], clients: [], payments: {}, pin: null });
@@ -990,7 +1027,7 @@
               <Header year={vY} month={vM} onPrev={prev} onNext={next} onToday={goToday} onOpenSettings={() => setShowSettings(true)} />
               
               <div style={{ padding: "0 20px 140px" }}>
-                {tab === "summary" && <SummaryTab entries={monthEntries} unpaidMap={initialUnpaidMap} year={vY} month={vM} onDelete={setDel} onEditAmount={onEditAmt} />}
+                {tab === "summary" && <SummaryTab entries={monthEntries} unpaidMap={initialUnpaidMap} year={vY} month={vM} onDelete={setDel} onEditEntry={onEditEntry} />}
                 {tab === "payment" && <PaymentTab entries={monthEntries} unpaidMap={initialUnpaidMap} endOfMonthUnpaidMap={endOfMonthUnpaidMap} onFullCheck={onFullCheck} onPartialPay={onPartialPay} onResetPay={onResetPay} monthKey={curMk} payments={safeData.payments} />}
               </div>
               
