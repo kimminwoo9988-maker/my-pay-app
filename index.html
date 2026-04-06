@@ -186,9 +186,8 @@
           }
           return <div style={{...S.card, padding: "20px 12px", marginBottom: 24}}><div style={S.calGrid}>{cells}</div></div>;
         }
-    // ─── ✨ 프리미엄 Invoice 정산서 (스크롤 & 버튼 고정 완벽 수정본) ───
 
-// ─── ✨ 프리미엄 Invoice 정산서 (버튼 동기화 + 헤더 숨김 + 하단 여백 완벽 수정본) ───
+        // ─── ✨ 프리미엄 Invoice 정산서 (버튼 동기화 + 헤더 숨김 + 하단 여백 완벽 수정본) ───
         function ReceiptModal({ client, month, year, items, unpaid, unpaidItems, onClose }) {
           const [isProcessing, setIsProcessing] = useState(false);
           const currentTotal = items.reduce((s, e) => s + amt(e), 0);
@@ -229,9 +228,7 @@
           const hasUnpaidDetail = unpaid > 0 && unpaidItems && unpaidItems.length > 0;
 
           return (
-            // 변경 1: 배경을 솔리드 컬러(#0f111a)로 변경하고, zIndex를 20으로 설정하여 상단 헤더는 가리고 하단 메뉴바는 살립니다.
             <div style={{ ...S.overlay, zIndex: 20, background: "#0f111a", padding: 0, flexDirection: "column" }} onClick={onClose}>
-              
               <div
                 className="animate-pop"
                 onClick={e => e.stopPropagation()}
@@ -241,7 +238,6 @@
                   overflowY: "auto",
                   WebkitOverflowScrolling: "touch",
                   overscrollBehavior: "contain",
-                  // 변경 2: 아래쪽 패딩을 130px로 넉넉하게 주어 하단 메뉴바에 내용이 가려지지 않게 합니다.
                   padding: "40px 24px 130px", 
                   display: "flex",
                   flexDirection: "column",
@@ -282,7 +278,6 @@
                   </div>
                 </div>
 
-                {/* 변경 3: 버튼들을 스크롤 영역 안으로 이동시켰습니다. 이제 정산서와 함께 스크롤됩니다. */}
                 <div style={{ width: "100%", maxWidth: 400, display: "flex", flexDirection: "column", gap: 10, marginTop: 24, flexShrink: 0 }}>
                   <div style={{ display: "flex", gap: 10 }}>
                     <button onClick={saveImage} disabled={isProcessing} style={{ flex: 1, padding: "14px", background: "#7aa2f7", border: "none", borderRadius: 14, color: "#0f111a", fontWeight: 900, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> 이미지 저장</button>
@@ -293,14 +288,126 @@
                     <button onClick={onClose} style={{ flex: 1, padding: "14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 14, color: "#a9b1d6", fontWeight: 800, fontSize: 15, cursor: "pointer" }}>닫기</button>
                   </div>
                 </div>
-
               </div>
             </div>
           );
         }
 
+        // ─── [수정2] SummaryTab에 allEntries prop 추가 ───
+        function SummaryTab({ entries, unpaidMap, year, month, onDelete, onEditEntry, allEntries }) {
+          const [selDay, setSelDay] = useState(null); const [openClient, setOpenClient] = useState(null); const [receiptClient, setReceiptClient] = useState(null);
+          const [editId, setEditId] = useState(null); const [editAmt, setEditAmt] = useState(""); const [editDesc, setEditDesc] = useState("");
+          const groups = {}; (entries||[]).forEach(e => { if (!groups[e.client]) groups[e.client] = { total: 0, count: 0, items: [] }; groups[e.client].total += amt(e); groups[e.client].count++; groups[e.client].items.push(e); });
+          const grandTotal = (entries||[]).reduce((s, e) => s + amt(e), 0);
+          const allClients = [...new Set([...Object.keys(groups), ...Object.keys(unpaidMap || {})])];
+          const deadlines = (entries||[]).filter(e => e.deadline && !e.paid).sort((a,b) => new Date(a.deadline) - new Date(b.deadline));
+          const doEdit = (e) => { const r = parseInt(editAmt.replace(/,/g,""),10); if (!isNaN(r) && r > 0) onEditEntry(e.id, r, editDesc); setEditId(null); };
 
-        
+          return (
+            <div className="animate-fade">
+              <TotalDashboard current={grandTotal} unpaidMap={unpaidMap} />
+              {deadlines.length > 0 && <div style={{ marginBottom: 24, padding: "0 4px" }}>
+                <div style={{fontSize: 14, fontWeight: 800, color: "#f7768e", marginBottom: 12, display: "flex", alignItems: "center", gap: 6}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>다가오는 마감일</div>
+                <div style={{display: "flex", gap: 10, overflowX: "auto", paddingBottom: 8}}>{deadlines.map(e => { const dday = getDDay(e.deadline); return <div key={e.id} style={{ background: "rgba(247,118,142,0.1)", border: "1px solid rgba(247,118,142,0.2)", borderRadius: 16, padding: "12px 16px", minWidth: 140 }}><div style={{fontSize: 12, fontWeight: 700, color: dday<=0?"#f7768e":"#e0af68"}}>{dday===0?"D-Day (오늘)":dday<0?`${Math.abs(dday)}일 지남`:`D-${dday}`}</div><div style={{fontSize: 14, fontWeight: 800, marginTop: 4, whiteSpace: "nowrap"}}>{e.client}</div><div style={{fontSize: 12, color: "#8a94b5", marginTop: 2, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", maxWidth: 100}}>{e.desc||"작업"}</div></div>; })}</div>
+              </div>}
+              <Calendar year={year} month={month} entries={entries} selectedDay={selDay} onSelect={setSelDay} />
+              {selDay && <div className="animate-pop" style={{...S.card, padding: 24, marginBottom: 24, border: "1px solid rgba(122,162,247,0.4)"}}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}><span style={{ fontSize: 18, fontWeight: 800, color: "#c0caf5" }}>{month+1}월 {selDay}일</span><button onClick={() => setSelDay(null)} style={{ background: "none", border: "none", color: "#565f89", fontSize: 20, cursor: "pointer", padding: "0 8px" }}>✕</button></div>
+                {(entries||[]).filter(e => new Date(e.date).getDate()===selDay).map(e => <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}><div><div style={{ fontSize: 16, fontWeight: 800, color: "#e0e2eb" }}>{e.client}</div><div style={{ fontSize: 13, color: e.discount?"#f7768e":"#8a94b5", marginTop: 4 }}>{tag(e)}</div></div><div style={{ fontSize: 17, fontWeight: 800, color: e.discount?"#f7768e":"#7aa2f7" }}>{e.discount?"-":""}{won(e.amount)}</div></div>)}
+              </div>}
+              <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingBottom: 20 }}>
+                {allClients.map((name, i) => {
+                  const g = groups[name]; const un = (unpaidMap||{})[name]||0; const total = (g?g.total:0)+un;
+                  if (total===0 && !g) return null;
+                  const c = COLORS[i%8]; const isOpen = openClient===name; const items = g?g.items:[];
+                  return (<div key={name} style={{ background: isOpen?"rgba(36,40,59,0.9)":"rgba(36,40,59,0.5)", borderRadius: 18, border: "1px solid rgba(255,255,255,0.05)", borderLeft: `5px solid ${c}`, overflow: "hidden", transition: "all 0.3s" }}>
+                    <div onClick={() => setOpenClient(isOpen?null:name)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 16px", cursor: "pointer" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 17, fontWeight: 800, color: "#fff" }}>{name}</span>
+                        {un > 0 && <span style={{ background: "rgba(247,118,142,0.15)", color: "#f7768e", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 800 }}>미정산</span>}
+                        {un < 0 && <span style={{ background: "rgba(158,206,106,0.15)", color: "#9ece6a", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 800 }}>선지급</span>}
+                        {g && <span style={{ fontSize: 12, fontWeight: 700, color: "#8a94b5", background: "rgba(0,0,0,0.3)", padding: "4px 10px", borderRadius: 12 }}>{g.count}건</span>}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}><span style={{ fontSize: 18, fontWeight: 900, color: total<0?"#9ece6a":c }}>{total<0?`+${won(Math.abs(total))}`:won(total)}</span><span style={{ fontSize: 14, color: "#565f89", transform: isOpen?"rotate(180deg)":"rotate(0)", transition: "0.3s" }}>▼</span></div>
+                    </div>
+                    {isOpen && <div className="animate-slide" style={{ padding: "0 16px 16px" }}>
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+                        <button onClick={ev => { ev.stopPropagation(); setReceiptClient(name); }} style={{ padding: "10px 16px", background: "rgba(122,162,247,0.15)", border: "1px solid rgba(122,162,247,0.3)", borderRadius: 12, color: "#7aa2f7", fontSize: 14, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>정산서 보기</button>
+                      </div>
+                      {items.map(e => <div key={e.id} style={{ padding: "14px 0", borderBottom: "1px dashed rgba(255,255,255,0.1)" }}>
+                        {editId===e.id ? <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%" }}><input value={editDesc} onChange={ev => setEditDesc(ev.target.value)} placeholder="내용" style={{ flex: 1, padding: "10px", background: "rgba(0,0,0,0.4)", border: "1px solid #7aa2f7", borderRadius: 10, color: "#fff", fontSize: 14, minWidth: 0 }} /><input value={editAmt} onChange={ev => setEditAmt(fmt(ev.target.value))} inputMode="numeric" style={{ width: 85, padding: "10px", background: "rgba(0,0,0,0.4)", border: "1px solid #7aa2f7", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 800, textAlign: "right", minWidth: 0 }} onKeyDown={ev => { if (ev.key==="Enter") doEdit(e); if (ev.key==="Escape") setEditId(null); }} /><button onClick={() => doEdit(e)} style={{ padding: "10px 14px", background: "#7aa2f7", border: "none", borderRadius: 10, color: "#0f111a", fontSize: 14, fontWeight: 900, flexShrink: 0 }}>확인</button></div>
+                        : <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontSize: 15, fontWeight: 600, color: e.discount?"#f7768e":"#c0caf5" }}>{tag(e)}</div>{e.deadline && <div style={{fontSize: 11, color: "#f7768e", marginTop: 4}}>마감: {e.deadline}</div>}</div><div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 16, fontWeight: 800, color: e.discount?"#f7768e":"#fff" }}>{e.discount?"-":""}{won(e.amount)}</span><button onClick={() => { setEditId(e.id); setEditAmt(e.amount.toLocaleString("ko-KR")); setEditDesc(e.desc||""); }} style={S.editBtn}>수정</button><button onClick={() => onDelete(e)} style={S.delBtn}>✕</button></div></div>}
+                      </div>)}
+                    </div>}
+                  </div>);
+                })}
+                {allClients.length === 0 && <div style={S.empty}>이번 달 작업 기록이 없습니다.</div>}
+              </div>
+              {/* ─── [수정3] ReceiptModal 호출부 - unpaidItems 추가 ─── */}
+              {receiptClient && (() => {
+                const curMk = mk(year, month);
+                const clientUnpaidItems = (allEntries || []).filter(e => {
+                  const d = new Date(e.date);
+                  return e.client === receiptClient && mk(d.getFullYear(), d.getMonth()) < curMk && !e.paid;
+                });
+                return <ReceiptModal client={receiptClient} month={month} year={year} items={groups[receiptClient]?.items || []} unpaid={(unpaidMap||{})[receiptClient]||0} unpaidItems={clientUnpaidItems} onClose={() => setReceiptClient(null)} />;
+              })()}
+            </div>
+          );
+        }
+
+        function PaymentTab({ entries, unpaidMap, endOfMonthUnpaidMap, onFullCheck, onPartialPay, onResetPay, monthKey, payments }) {
+          const byClient = {}; (entries||[]).forEach(e => { if (!byClient[e.client]) byClient[e.client] = []; byClient[e.client].push(e); });
+          const allClients = [...new Set([...Object.keys(byClient), ...Object.keys(unpaidMap||{})])];
+          const rows = allClients.map(client => {
+            const items = byClient[client]||[]; const thisTotal = items.reduce((s,e) => s+amt(e), 0);
+            const unpaid = (unpaidMap||{})[client]||0; const endUnpaid = (endOfMonthUnpaidMap||{})[client]||0; const total = thisTotal+unpaid;
+            if (items.length===0 && unpaid===0 && endUnpaid===0) return null;
+            const paid = items.length>0 && items.every(e => e.paid); const paidAmt = (payments&&payments[`${monthKey}::${client}`])||0;
+            const done = (items.length===0||paid) && endUnpaid<=0; const isFullyPaid = done||(total>0&&paidAmt>=total)||endUnpaid<=0;
+            return { client, items, thisTotal, unpaid, total, paid, paidAmt, endUnpaid, isFullyPaid };
+          }).filter(Boolean);
+          const totalDue = rows.reduce((s,r) => s+r.total, 0);
+          const totalPaid = rows.reduce((s,r) => s+(r.paidAmt||0)+(r.paid&&r.items.length>0?r.thisTotal:0), 0);
+          if (rows.length===0) return <div className="animate-fade" style={S.card}><div style={S.empty}>이번 달 기록이 없습니다.</div></div>;
+          return (<div className="animate-fade">
+            <div style={{ background: "rgba(36,40,59,0.6)", borderRadius: 24, padding: "24px 20px", marginBottom: 24, border: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between" }}>
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>총 정산액</div><div style={{ fontSize: 20, fontWeight: 900, color: "#c0caf5", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{totalDue<0?`-${won(Math.abs(totalDue))}`:won(totalDue)}</div></div>
+              <div style={{ width: 1, background: "rgba(255,255,255,0.1)", margin: "0 16px" }} />
+              <div style={{ flex: 1, textAlign: "right", minWidth: 0 }}><div style={{ fontSize: 13, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>완료된 입금</div><div style={{ fontSize: 20, fontWeight: 900, color: "#9ece6a", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{won(totalPaid)}</div></div>
+            </div>
+            {rows.map(r => <PayRow key={r.client} {...r} onCheck={() => onFullCheck(r.client, monthKey, !r.isFullyPaid)} onPay={a => onPartialPay(r.client, monthKey, a)} onReset={() => onResetPay(r.client)} />)}
+          </div>);
+        }
+
+        function PayRow({ client, total, thisTotal, unpaid, isFullyPaid, paidAmt, endUnpaid, items, onCheck, onPay, onReset }) {
+          const [open, setOpen] = useState(false); const [val, setVal] = useState("");
+          const go = () => { const r = parseInt(val.replace(/,/g,""),10); if(!isNaN(r)&&r>0){ onPay(r); setVal(""); setOpen(false); }};
+          return (<div style={{ background: isFullyPaid?"rgba(26,27,38,0.5)":"rgba(36,40,59,0.9)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: isFullyPaid?0.6:1 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 16, cursor: "pointer", flex: 1 }}>
+                <div style={{ width: 34, height: 34, borderRadius: "50%", background: isFullyPaid?"#9ece6a":"rgba(0,0,0,0.3)", border: isFullyPaid?"none":"2px solid #565f89", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <input type="checkbox" checked={isFullyPaid} onChange={onCheck} style={{ opacity: 0, position: "absolute", width: 34, height: 34, cursor: "pointer" }} />
+                  {isFullyPaid && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f111a" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>}
+                </div>
+                <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: isFullyPaid?"#7a84a6":"#fff", textDecoration: isFullyPaid&&total>0?"line-through":"none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
+                  {unpaid>0 && <div style={{ fontSize: 11, color: "#e0af68", marginTop: 4, fontWeight: 700 }}>미정산 이월 포함됨</div>}
+                  {unpaid<0 && <div style={{ fontSize: 11, color: "#9ece6a", marginTop: 4, fontWeight: 700 }}>선지급 차감됨 (+{won(Math.abs(unpaid))})</div>}
+                </div>
+              </label>
+              <div style={{ flexShrink: 0, textAlign: "right" }}><span style={{ fontSize: 22, fontWeight: 900, color: isFullyPaid?"#7a84a6":"#7aa2f7", textDecoration: isFullyPaid&&total>0?"line-through":"none" }}>{total<0?`-${won(Math.abs(total))}`:won(total)}</span></div>
+            </div>
+            {paidAmt>0 && <div className="animate-fade" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 16, borderTop: "1px dashed rgba(255,255,255,0.1)" }}>
+              {endUnpaid<0 ? <span style={{ fontSize: 13, color: "#9ece6a", fontWeight: 800 }}>정산 후 남은 금액(선지급): +{won(Math.abs(endUnpaid))}</span> : <span style={{ fontSize: 14, color: isFullyPaid?"#7aa2f7":"#9ece6a", fontWeight: 800 }}>누적 입금: {won(paidAmt)}</span>}
+              <button onClick={onReset} style={{ background: "rgba(231,76,60,0.15)", border: "none", borderRadius: 10, color: "#e74c3c", fontSize: 13, fontWeight: 800, padding: "8px 14px", cursor: "pointer", flexShrink: 0 }}>취소</button>
+            </div>}
+            {!isFullyPaid && <div style={{ marginTop: 16 }}>
+              {!open ? <button onClick={() => setOpen(true)} style={S.partialBtn}>+ 분할 입금액 추가</button>
+              : <div className="animate-slide"><div style={{ display: "flex", gap: 10 }}><input value={val} onChange={e => setVal(fmt(e.target.value))} placeholder="입금된 금액" inputMode="numeric" style={{...S.partialInput, minWidth: 0}} onKeyDown={e => e.key==="Enter"&&go()} autoFocus /><button onClick={go} style={{ padding: "0 20px", background: "#7aa2f7", border: "none", borderRadius: 14, color: "#0f111a", fontWeight: 900, fontSize: 16, flexShrink: 0 }}>확인</button><button onClick={() => { setOpen(false); setVal(""); }} style={{ padding: "0 16px", background: "rgba(0,0,0,0.3)", border: "none", borderRadius: 14, color: "#a9b1d6", fontWeight: 800, flexShrink: 0 }}>취소</button></div><QuickBtns val={val} setVal={setVal} /></div>}
+            </div>}
+          </div>);
+        }
 
         function BottomSheetForm({ clients, onAdd, onNewClient, onClose }) {
           const [client, setClient] = useState(""); const [amount, setAmount] = useState(""); const [desc, setDesc] = useState("");
