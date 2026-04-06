@@ -327,7 +327,7 @@
           return <div style={{...S.card, padding: "20px 12px", marginBottom: 24}}><div style={S.calGrid}>{cells}</div></div>;
         }
 
-// ─── ✨ 프리미엄 Invoice 정산서 (금액 폰트 자동 조절 및 잘림 방지 반영) ✨ ───
+// ─── ✨ 프리미엄 Invoice 정산서 (업체명과 TOTAL DUE 간격 축소 반영) ✨ ───
         function ReceiptModal({ client, month, year, items, unpaid, unpaidItems, onClose }) {
           const [isProcessing, setIsProcessing] = useState(false);
           const currentTotal = items.reduce((s, e) => s + amt(e), 0);
@@ -335,7 +335,7 @@
           const d = new Date();
           const todayStr = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")}`;
 
-          // ✨ 금액 길이에 따라 폰트 크기를 자동으로 줄여주는 로직 (원 글자 잘림 방지)
+          // ✨ 금액 길이에 따라 폰트 크기를 자동으로 줄여주는 로직
           const finalTotalStr = finalTotal < 0 ? "0" : Math.abs(finalTotal).toLocaleString("ko-KR");
           const dueFontSize = finalTotalStr.length > 11 ? 20 : finalTotalStr.length > 8 ? 24 : 30;
           const totalFontSize = finalTotalStr.length > 11 ? 16 : finalTotalStr.length > 8 ? 18 : 22;
@@ -420,7 +420,8 @@
                     <div style={{ fontSize: 38, fontWeight: 900, color: "#111", letterSpacing: "-1px", lineHeight: 1 }}>INVOICE</div>
                   </div>
 
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", padding: "0 0 32px 0", marginBottom: 32 }}>
+                  {/* ✨ 간격 축소 부분 (padding과 marginBottom 값을 줄임) */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", padding: "0 0 16px 0", marginBottom: 20 }}>
                     <div>
                         <div style={{ fontSize: 10, fontWeight: 800, color: "#888", letterSpacing: "2px", marginBottom: 6 }}>CLIENT</div>
                         <div style={{ fontSize: 20, fontWeight: 900, color: "#111" }}>{client}</div>
@@ -431,7 +432,7 @@
                     </div>
                   </div>
 
-                  {/* ✨ 매트 블랙 토탈 라벨 (동적 폰트 사이즈 적용) */}
+                  {/* 매트 블랙 토탈 라벨 */}
                   <div style={{ background: "#111", borderRadius: 12, padding: "24px", marginBottom: 36, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 10px 20px rgba(0,0,0,0.08)" }}>
                     <span style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: "2px", flexShrink: 0 }}>TOTAL DUE</span>
                     <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 1, minWidth: 0, marginLeft: 12 }}>
@@ -457,7 +458,7 @@
                     </tbody>
                   </table>
 
-                  {/* ✨ 하단 일반 Total 영역 (동적 폰트 사이즈 적용) */}
+                  {/* 하단 일반 Total 영역 */}
                   <div style={{ borderTop: "2px solid #111", borderBottom: "2px solid #111", padding: "16px 0", marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 14, fontWeight: 900, color: "#111", letterSpacing: "1px", flexShrink: 0 }}>TOTAL</span>
                     <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 1, minWidth: 0, marginLeft: 12 }}>
