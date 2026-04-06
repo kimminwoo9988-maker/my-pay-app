@@ -187,7 +187,8 @@
           return <div style={{...S.card, padding: "20px 12px", marginBottom: 24}}><div style={S.calGrid}>{cells}</div></div>;
         }
     // ─── ✨ 프리미엄 Invoice 정산서 (스크롤 & 버튼 고정 완벽 수정본) ───
- // ─── ✨ 프리미엄 Invoice 정산서 (버튼 동기화 + 헤더 숨김 + 하단 여백 완벽 수정본) ───
+
+// ─── ✨ 프리미엄 Invoice 정산서 (버튼 동기화 + 헤더 숨김 + 하단 여백 완벽 수정본) ───
         function ReceiptModal({ client, month, year, items, unpaid, unpaidItems, onClose }) {
           const [isProcessing, setIsProcessing] = useState(false);
           const currentTotal = items.reduce((s, e) => s + amt(e), 0);
@@ -297,6 +298,9 @@
             </div>
           );
         }
+
+
+        
 
         function BottomSheetForm({ clients, onAdd, onNewClient, onClose }) {
           const [client, setClient] = useState(""); const [amount, setAmount] = useState(""); const [desc, setDesc] = useState("");
