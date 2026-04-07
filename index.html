@@ -264,7 +264,7 @@
                         </button>
                     </div>
                     <button onClick={onOpenSettings} style={{...S.navBtn, width: 44, height: 44, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#a9b1d6"}}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0-1.51 1z"/></svg>
                     </button>
                 </div>
             );
@@ -331,7 +331,7 @@
             return <div style={{...S.card, padding: "20px 12px", marginBottom: 24}}><div style={S.calGrid}>{cells}</div></div>;
         }
 
-        // ─── ✨ 프리미엄 Invoice 정산서 ───
+        // ─── ✨ 프리미엄 Invoice 정산서 ✨ ───
         function ReceiptModal({ client, month, year, items, unpaid, unpaidItems, onClose }) {
             const [isProcessing, setIsProcessing] = useState(false);
             const currentTotal = items.reduce((s, e) => s + amt(e), 0);
@@ -339,6 +339,7 @@
             const d = new Date();
             const todayStr = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")}`;
 
+            // 금액 길이에 따른 다이나믹 폰트
             const finalTotalStr = finalTotal < 0 ? "0" : Math.abs(finalTotal).toLocaleString("ko-KR");
             const dueFontSize = finalTotalStr.length > 11 ? 20 : finalTotalStr.length > 8 ? 24 : 30;
             const totalFontSize = finalTotalStr.length > 11 ? 16 : finalTotalStr.length > 8 ? 18 : 22;
@@ -535,7 +536,13 @@
             });
             const grandTotal = (entries||[]).reduce((s, e) => s + amt(e), 0);
             const allClients = [...new Set([...Object.keys(groups), ...Object.keys(unpaidMap || {})])];
-            const deadlines = (entries||[]).filter(e => e.deadline && !e.paid).sort((a,b) => new Date(a.deadline) - new Date(b.deadline));
+            
+            // ✨ D-Day 알림을 3일 이하(D-3)인 경우에만 표시
+            const deadlines = (entries||[]).filter(e => {
+                if (!e.deadline || e.paid) return false;
+                const dday = getDDay(e.deadline);
+                return dday !== null && dday <= 3;
+            }).sort((a,b) => new Date(a.deadline) - new Date(b.deadline));
             
             const doEdit = (e) => { 
                 const r = parseInt(editAmt.replace(/,/g,""),10); 
@@ -784,20 +791,21 @@
             );
         }
 
-        // ─── ✨ 입력 폼 (스크롤 고정 & X버튼 복구) ✨ ───
+        // ─── ✨ 입력 폼 (할인 & 마감일 크기 동일화 / 달력 꼬임 해결 / 오늘 날짜 기본) ✨ ───
         function BottomSheetForm({ clients, onAdd, onNewClient, onClose }) {
             const [client, setClient] = useState(""); 
             const [amount, setAmount] = useState(""); 
             const [desc, setDesc] = useState("");
             const [dateVal, setDateVal] = useState(today()); 
-            const [deadline, setDeadline] = useState(""); 
+            // 마감일 기본값을 오늘로 세팅!
+            const [deadline, setDeadline] = useState(today()); 
             const [useDeadline, setUseDeadline] = useState(false);
             const [discount, setDiscount] = useState(false); 
             const [showNew, setShowNew] = useState(false); 
             const [newName, setNewName] = useState(""); 
             const [isSubmitting, setIsSubmitting] = useState(false);
 
-            // 팝업이 켜졌을 때 뒷배경(달력)이 스크롤되지 않도록 잠금
+            // 뒷배경 스크롤 방지는 유지!
             useEffect(() => {
                 document.body.style.overflow = 'hidden';
                 return () => { document.body.style.overflow = ''; };
@@ -880,6 +888,7 @@
                             <QuickBtns val={amount} setVal={setAmount} />
                         </div>
 
+                        {/* ✨ 1. 할인 적용 (갭 8, 체크박스 22x22, 폰트 16 고정) */}
                         <div style={{ display: "flex", gap: 12, marginBottom: 16, width: "100%", boxSizing: "border-box" }}>
                             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: discount?"rgba(247,118,142,0.15)":"rgba(255,255,255,0.05)", padding: "16px", borderRadius: 14, border: `1px solid ${discount?"#f7768e":"transparent"}`, flexShrink: 0, whiteSpace: "nowrap" }}>
                                 <input type="checkbox" checked={discount} onChange={e => setDiscount(e.target.checked)} style={{ accentColor: "#f7768e", width: 22, height: 22, margin: 0 }} />
@@ -888,14 +897,20 @@
                             {!discount && <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="작업 내용 (선택)" style={{...S.input, flex: 1, minWidth: 0}} onKeyDown={e => e.key==="Enter"&&submit()} />}
                         </div>
 
+                        {/* ✨ 2. 마감일 알림 (할인 적용과 크기 동일하게 맞춤 + 레이아웃 꼬임 해결) */}
                         <div style={{...S.field, width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.02)", padding: "16px", borderRadius: 14}}>
-                            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                                <input type="checkbox" checked={useDeadline} onChange={e => setUseDeadline(e.target.checked)} style={{ accentColor: "#f7768e", width: 20, height: 20, margin: 0 }} />
-                                <span style={{ fontSize: 15, color: useDeadline?"#f7768e":"#a9b1d6", fontWeight: 800 }}>마감일 알림 추가하기</span>
+                            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                                <input type="checkbox" checked={useDeadline} onChange={e => setUseDeadline(e.target.checked)} style={{ accentColor: "#f7768e", width: 22, height: 22, margin: 0 }} />
+                                <span style={{ fontSize: 16, color: useDeadline?"#f7768e":"#a9b1d6", fontWeight: 800 }}>마감일 알림 추가하기</span>
                             </label>
                             {useDeadline && (
                                 <div className="animate-fade" style={{ marginTop: 12 }}>
-                                    <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} style={{...S.input, width: "100%", boxSizing: "border-box", colorScheme: "dark", borderColor: "rgba(247,118,142,0.4)"}} />
+                                    <input 
+                                        type="date" 
+                                        value={deadline} 
+                                        onChange={e => setDeadline(e.target.value)} 
+                                        style={{...S.input, width: "100%", display: "block", boxSizing: "border-box", colorScheme: "dark", borderColor: "rgba(247,118,142,0.4)", margin: 0}} 
+                                    />
                                 </div>
                             )}
                         </div>
@@ -928,7 +943,7 @@
             );
         }
 
-        // ─── ✨ 메인 앱 로직 ✨ ───
+        // ─── 메인 앱 로직 ───
         function MainApp({ data, persist, user }) {
             const safeData = sanitizeData(data);
             const [pinState, setPinState] = useState(safeData.pin ? "verify" : "setup");
@@ -1026,13 +1041,11 @@
                     <GlobalStyle />
                     {!hideHeader && <Header year={vY} month={vM} onPrev={prev} onNext={next} onToday={goToday} onOpenSettings={() => setShowSettings(true)} />}
                     
-                    {/* ✨ 상단 헤더 고정을 위한 flex 레이아웃 스크롤 영역 ✨ */}
                     <div style={{ flex: 1, padding: "0 20px 140px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
                         {tab==="summary" && <SummaryTab entries={monthEntries} unpaidMap={initialUnpaidMap} year={vY} month={vM} onDelete={setDel} onEditEntry={onEditEntry} allEntries={safeData.entries} setHideHeader={setHideHeader} />}
                         {tab==="payment" && <PaymentTab entries={monthEntries} unpaidMap={initialUnpaidMap} endOfMonthUnpaidMap={endOfMonthUnpaidMap} onFullCheck={onFullCheck} onPartialPay={onPartialPay} onResetPay={onResetPay} monthKey={curMk} payments={safeData.payments} />}
                     </div>
                     
-                    {/* 하단 네비게이션 */}
                     <div style={{ position: "fixed", bottom: "max(24px, env(safe-area-inset-bottom))", left: 20, right: 20, maxWidth: 440, margin: "0 auto", height: 76, background: "rgba(26,27,38,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderRadius: 38, border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px", zIndex: 30, boxShadow: "0 24px 48px rgba(0,0,0,0.5)" }}>
                         <button onClick={() => setTab("summary")} style={{ flex: 1, height: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, position: "relative" }}>
                             {tab==="summary" && <div style={{ position: "absolute", inset: "10px 14px", background: "rgba(255,255,255,0.06)", borderRadius: 24, zIndex: -1 }} className="animate-fade" />}
@@ -1044,7 +1057,6 @@
                         </button>
                         <button onClick={() => setTab("payment")} style={{ flex: 1, height: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, position: "relative" }}>
                             {tab==="payment" && <div style={{ position: "absolute", inset: "10px 14px", background: "rgba(255,255,255,0.06)", borderRadius: 24, zIndex: -1 }} className="animate-fade" />}
-                            {/* ✨ ₩ (원화) 아이콘으로 교체 완료 */}
                             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={tab==="payment"?"#9ece6a":"#565f89"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M6 6l3 12 3-8 3 8 3-12"/>
                                 <path d="M4 11h16"/>
@@ -1054,7 +1066,6 @@
                         </button>
                     </div>
                     
-                    {/* 팝업 모달들 */}
                     {showSettings && <SettingsModal onChangePin={() => setPinState("change_old")} onManageClients={() => setShowClientManager(true)} onResetData={onResetData} onLogout={() => auth.signOut()} onClose={() => setShowSettings(false)} />}
                     {showClientManager && <ClientManagerModal clients={safeData.clients} onUpdate={onUpdateClient} onDelete={onDeleteClient} onClose={() => setShowClientManager(false)} />}
                     {showAdd && <BottomSheetForm clients={safeData.clients} onAdd={onAdd} onNewClient={onNewClient} onClose={() => setShowAdd(false)} />}
@@ -1114,7 +1125,7 @@
             return <MainApp data={data} persist={persist} user={user} />;
         }
 
-        // ─── ✨ 공통 스타일 세팅 (헤더 고정을 위한 flex 레이아웃 반영) ✨ ───
+        // ─── 공통 스타일 세팅 ───
         const S = {
             app: { background: "#0f111a", height: "100vh", overflow: "hidden", color: "#e8e8ed", maxWidth: 480, margin: "0 auto", position: "relative", display: "flex", flexDirection: "column" },
             header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "calc(env(safe-area-inset-top) + 20px) 20px 24px", background: "#0f111a", flexShrink: 0, zIndex: 10 },
