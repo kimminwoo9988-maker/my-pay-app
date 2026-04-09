@@ -779,6 +779,9 @@
 
             if (rows.length===0) return <div className="animate-fade" style={S.card}><div style={S.empty}>이번 달 입금/청구 내역이 없습니다.</div></div>;
             
+            // ✨ 남은 미수금 전체 색상 반영 로직 (마이너스면 초록, 아니면 빨강)
+            const totalRemainingColor = totalRemaining < 0 ? "#9ece6a" : "#f7768e";
+
             return (
                 <div className="animate-fade">
                     <div style={{ background: "rgba(36,40,59,0.6)", borderRadius: 24, padding: "24px 20px", marginBottom: 24, border: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between" }}>
@@ -788,8 +791,8 @@
                         </div>
                         <div style={{ width: 1, background: "rgba(255,255,255,0.1)", margin: "0 16px" }} />
                         <div style={{ flex: 1, textAlign: "right", minWidth: 0 }}>
-                            <div style={{ fontSize: 13, color: "#7aa2f7", fontWeight: 700, marginBottom: 8 }}>남은 미수금</div>
-                            <div style={{ fontSize: 20, fontWeight: 900, color: "#7aa2f7", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{totalRemaining<0?`+${won(Math.abs(totalRemaining))}`:won(totalRemaining)}</div>
+                            <div style={{ fontSize: 13, color: totalRemainingColor, fontWeight: 700, marginBottom: 8 }}>남은 미수금</div>
+                            <div style={{ fontSize: 20, fontWeight: 900, color: totalRemainingColor, whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{totalRemaining<0?`+${won(Math.abs(totalRemaining))}`:won(totalRemaining)}</div>
                         </div>
                     </div>
                     {rows.map(r => <PayRow key={r.client} {...r} monthKey={monthKey} onTogglePaid={onTogglePaid} onToggleMultiplePaid={onToggleMultiplePaid} onPartialPay={a => onPartialPay(r.client, monthKey, a)} onResetPay={() => onResetPay(r.client)} />)}
@@ -797,7 +800,7 @@
             );
         }
 
-        // ─── ✨ 입금 항목 (PayRow - 수정 완료) ✨ ───
+        // ─── 입금 항목 (PayRow) ───
         function PayRow({ client, allItems, totalBilled, remaining, totalPayments, onTogglePaid, onToggleMultiplePaid, onPartialPay, onResetPay }) {
             const [open, setOpen] = useState(false); 
             const [val, setVal] = useState("");
@@ -814,14 +817,19 @@
                 onToggleMultiplePaid(allItems.map(i => i.id), !allPaid);
             };
 
+            // ✨ 각 항목 미수금 색상 (마이너스면 초록, 0이면 회색, 남았으면 빨강)
+            const remainingColor = remaining === 0 ? "#7a84a6" : (remaining < 0 ? "#9ece6a" : "#f7768e");
+
             return (
                 <div style={{ background: remaining === 0 && allItems.length > 0 ? "rgba(26,27,38,0.5)" : "rgba(36,40,59,0.9)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: remaining === 0 && allItems.length > 0 ? 0.6 : 1 }}>
                     <div onClick={() => setOpen(!open)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                         <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
                             <div style={{ fontSize: 18, fontWeight: 900, color: remaining === 0 ? "#7a84a6" : "#fff", textDecoration: remaining === 0 && totalBilled > 0 ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
+                            {unpaid>0 && <div style={{ fontSize: 11, color: "#e0af68", marginTop: 4, fontWeight: 700 }}>미정산 이월 포함됨</div>}
+                            {unpaid<0 && <div style={{ fontSize: 11, color: "#9ece6a", marginTop: 4, fontWeight: 700 }}>선지급 차감됨 (+{won(Math.abs(unpaid))})</div>}
                         </div>
                         <div style={{ flexShrink: 0, textAlign: "right", display: "flex", alignItems: "center", gap: 12 }}>
-                            <span style={{ fontSize: 22, fontWeight: 900, color: remaining === 0 ? "#7a84a6" : "#7aa2f7", textDecoration: remaining === 0 && totalBilled > 0 ? "line-through" : "none" }}>{remaining < 0 ? `+${won(Math.abs(remaining))}` : won(remaining)}</span>
+                            <span style={{ fontSize: 22, fontWeight: 900, color: remainingColor, textDecoration: remaining === 0 && totalBilled > 0 ? "line-through" : "none" }}>{remaining < 0 ? `+${won(Math.abs(remaining))}` : won(remaining)}</span>
                             <span style={{ fontSize: 14, color: "#565f89", transform: open ? "rotate(180deg)" : "rotate(0)", transition: "0.3s" }}>▼</span>
                         </div>
                     </div>
@@ -867,149 +875,7 @@
             );
         }
 
-        // ─── 입력 폼 창 ───
-        function BottomSheetForm({ clients, onAdd, onNewClient, onClose }) {
-            const [client, setClient] = useState(""); 
-            const [amount, setAmount] = useState(""); 
-            const [desc, setDesc] = useState("");
-            const [dateVal, setDateVal] = useState(today()); 
-            const [deadline, setDeadline] = useState(today()); 
-            const [useDeadline, setUseDeadline] = useState(false);
-            const [discount, setDiscount] = useState(false); 
-            const [showNew, setShowNew] = useState(false); 
-            const [newName, setNewName] = useState(""); 
-            const [isSubmitting, setIsSubmitting] = useState(false);
-
-            useEffect(() => {
-                document.body.style.overflow = 'hidden';
-                return () => { document.body.style.overflow = ''; };
-            }, []);
-            
-            const submit = () => { 
-                if (isSubmitting) return; 
-                if (!client || !amount) return; 
-                const raw = parseInt(amount.replace(/,/g,""),10); 
-                if (isNaN(raw) || raw<=0) return; 
-                
-                setIsSubmitting(true); 
-                const [y,m,d] = dateVal.split("-").map(Number); 
-                onAdd({ 
-                    client, 
-                    amount: raw, 
-                    desc: discount ? "" : desc.trim(), 
-                    date: new Date(y,m-1,d,12).toISOString(), 
-                    deadline: useDeadline ? deadline : null, 
-                    discount 
-                }); 
-                setTimeout(() => { setIsSubmitting(false); onClose(); }, 100); 
-            };
-            
-            const addC = () => { 
-                if (!newName.trim()) return; 
-                onNewClient(newName.trim()); 
-                setClient(newName.trim()); 
-                setNewName(""); 
-                setShowNew(false); 
-            };
-
-            return (
-                <div style={{...S.overlay, alignItems: "flex-end", padding: 0}} onClick={onClose}>
-                    <div 
-                        className="animate-slide" 
-                        onClick={e => e.stopPropagation()} 
-                        style={{ 
-                            background: "#1a1b26", 
-                            width: "100%", 
-                            maxWidth: 480, 
-                            borderTopLeftRadius: 36, 
-                            borderTopRightRadius: 36, 
-                            padding: "0 24px calc(env(safe-area-inset-bottom) + 30px)", 
-                            boxShadow: "0 -10px 40px rgba(0,0,0,0.6)", 
-                            display: "flex", 
-                            flexDirection: "column"
-                        }}
-                    >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 24, paddingBottom: 24 }}>
-                            <div style={{ fontSize: 22, fontWeight: 900, color: "#fff" }}>새 작업 기록</div>
-                            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.1)", border: "none", width: 36, height: 36, borderRadius: "50%", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16 }}>✕</button>
-                        </div>
-
-                        <div style={{...S.field, width: "100%", boxSizing: "border-box"}}>
-                            <div style={{ display: "flex", gap: 10, width: "100%" }}>
-                                <input type="date" value={dateVal} onChange={e => setDateVal(e.target.value)} style={{...S.input, colorScheme: "dark", flex: 1, minWidth: 0, padding: "14px 12px"}} />
-                                {!showNew && (
-                                    <select value={client} onChange={e => setClient(e.target.value)} style={{...S.select, flex: 1.5, minWidth: 0, padding: "14px 12px"}}>
-                                        <option value="">업체 선택</option>
-                                        {(clients||[]).map(c => <option key={c} value={c}>{c}</option>)}
-                                    </select>
-                                )}
-                                {showNew && <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="새 업체명" style={{...S.input, flex: 1.5, minWidth: 0, padding: "14px 12px"}} onKeyDown={e => e.key==="Enter"&&addC()} autoFocus />}
-                                {showNew ? (
-                                    <button onClick={addC} style={{...S.confirmBtn, flexShrink: 0, padding: "0 16px"}}>추가</button>
-                                ) : (
-                                    <button onClick={() => setShowNew(true)} style={{...S.plusBtn, background: "rgba(255,255,255,0.05)", color: "#7aa2f7", flexShrink: 0, width: 52}}>+</button>
-                                )}
-                                {showNew && <button onClick={() => setShowNew(false)} style={{...S.plusBtn, background: "rgba(255,255,255,0.05)", color: "#a9b1d6", flexShrink: 0, width: 52}}>✕</button>}
-                            </div>
-                        </div>
-
-                        <div style={{...S.field, width: "100%", boxSizing: "border-box"}}>
-                            <div style={{ display: "flex", alignItems: "center", background: "rgba(0,0,0,0.2)", borderRadius: 18, border: "1px solid rgba(255,255,255,0.05)", padding: "10px 20px", width: "100%", boxSizing: "border-box" }}>
-                                <input value={amount} onChange={e => setAmount(fmt(e.target.value))} placeholder="0" inputMode="numeric" style={{ flex: 1, background: "none", border: "none", color: discount?"#f7768e":"#7aa2f7", fontSize: 32, fontWeight: 900, textAlign: "right", outline: "none", padding: "16px 0", minWidth: 0 }} onKeyDown={e => e.key==="Enter"&&submit()} />
-                                <span style={{ fontSize: 22, color: "#8a94b5", fontWeight: 800, marginLeft: 10, flexShrink: 0 }}>원</span>
-                            </div>
-                            <QuickBtns val={amount} setVal={setAmount} />
-                        </div>
-
-                        <div style={{ display: "flex", gap: 12, marginBottom: 16, width: "100%", boxSizing: "border-box" }}>
-                            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: discount?"rgba(247,118,142,0.15)":"rgba(255,255,255,0.05)", padding: "16px", borderRadius: 14, border: `1px solid ${discount?"#f7768e":"transparent"}`, flexShrink: 0, whiteSpace: "nowrap" }}>
-                                <input type="checkbox" checked={discount} onChange={e => setDiscount(e.target.checked)} style={{ accentColor: "#f7768e", width: 22, height: 22, margin: 0 }} />
-                                <span style={{ fontSize: 16, color: discount?"#f7768e":"#a9b1d6", fontWeight: 800 }}>할인 적용</span>
-                            </label>
-                            {!discount && <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="작업 내용 (선택)" style={{...S.input, flex: 1, minWidth: 0, boxSizing: "border-box"}} onKeyDown={e => e.key==="Enter"&&submit()} />}
-                        </div>
-
-                        <div style={{...S.field, display: "flex", flexDirection: "column", width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.02)", padding: "16px", borderRadius: 14}}>
-                            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                                <input type="checkbox" checked={useDeadline} onChange={e => setUseDeadline(e.target.checked)} style={{ accentColor: "#f7768e", width: 22, height: 22, margin: 0 }} />
-                                <span style={{ fontSize: 16, color: useDeadline?"#f7768e":"#a9b1d6", fontWeight: 800 }}>마감일 알림 추가하기</span>
-                            </label>
-                            {useDeadline && (
-                                <div className="animate-fade" style={{ marginTop: 16, display: "flex", width: "100%" }}>
-                                    <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} style={{...S.input, flex: 1, minWidth: 0, display: "block", boxSizing: "border-box", colorScheme: "dark", borderColor: "rgba(247,118,142,0.4)", margin: 0}} />
-                                </div>
-                            )}
-                        </div>
-                        
-                        <button onClick={submit} disabled={!client||!amount||isSubmitting} style={{...S.submitBtn, opacity: client&&amount?1:0.3, background: discount?"linear-gradient(135deg,#f7768e 0%,#ff9e64 100%)":"linear-gradient(135deg,#7aa2f7 0%,#bb9af7 100%)", width: "100%"}}>
-                            {discount?"할인 내역 저장":"기록 저장하기"}
-                        </button>
-                    </div>
-                </div>
-            );
-        }
-
-        // ─── 삭제 모달 ───
-        function DeleteModal({ entry, onConfirm, onCancel }) {
-            if (!entry) return null;
-            return (
-                <div style={S.overlay} onClick={onCancel}>
-                    <div className="animate-pop" onClick={e => e.stopPropagation()} style={{...S.card, width: "100%", maxWidth: 320, padding: 24, textAlign: "center", background: "#1a1b26"}}>
-                        <div style={{width: 60, height: 60, borderRadius: "50%", background: "rgba(231,76,60,0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px"}}>
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                        </div>
-                        <h3 style={{marginTop: 0, marginBottom: 12, fontSize: 20, fontWeight: 900, color: "#fff"}}>기록 삭제</h3>
-                        <p style={{fontSize: 15, color: "#8a94b5", lineHeight: 1.5, marginBottom: 24, wordBreak: "keep-all"}}>정말 이 기록을 삭제할까요?<br/>삭제된 데이터는 복구할 수 없습니다.</p>
-                        <div style={{display: "flex", gap: 10}}>
-                            <button onClick={onCancel} style={{flex: 1, padding: "14px", background: "rgba(255,255,255,0.05)", border: "none", borderRadius: 14, color: "#a9b1d6", fontSize: 16, fontWeight: 800, cursor: "pointer"}}>취소</button>
-                            <button onClick={onConfirm} style={{flex: 1, padding: "14px", background: "#e74c3c", border: "none", borderRadius: 14, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer"}}>삭제하기</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        // ─── 메인 앱 로직 ───
+        // ─── 메인 앱 ───
         function MainApp({ data, persist, user }) {
             const safeData = sanitizeData(data);
             const [pinState, setPinState] = useState(safeData.pin ? "verify" : "setup");
@@ -1022,28 +888,40 @@
             const [showSettings, setShowSettings] = useState(false);
             const [hideHeader, setHideHeader] = useState(false); 
 
+            // ✨ 어플 복귀(Background -> Foreground) 시 처리 로직
             useEffect(() => { 
-                const lockApp = () => { if (safeData.pin) setPinState("verify"); }; 
-                const hvc = () => { if (document.visibilityState==="hidden") lockApp(); }; 
-                document.addEventListener("visibilitychange", hvc); 
-                window.addEventListener("pagehide", lockApp); 
-                return () => { document.removeEventListener("visibilitychange", hvc); window.removeEventListener("pagehide", lockApp); }; 
+                const handleVisibilityChange = () => { 
+                    if (document.visibilityState === "hidden") {
+                        if (safeData.pin) setPinState("verify");
+                    } else if (document.visibilityState === "visible") {
+                        // ✨ 나갔다 들어오면 무조건 정산(이번 달)로 리셋
+                        const n = new Date();
+                        setVY(n.getFullYear()); 
+                        setVM(n.getMonth());
+                        setTab("summary");
+                    }
+                }; 
+                const handlePageHide = () => { 
+                    if (safeData.pin) setPinState("verify"); 
+                }; 
+                
+                document.addEventListener("visibilitychange", handleVisibilityChange); 
+                window.addEventListener("pagehide", handlePageHide); 
+                
+                return () => { 
+                    document.removeEventListener("visibilitychange", handleVisibilityChange); 
+                    window.removeEventListener("pagehide", handlePageHide); 
+                }; 
             }, [safeData.pin]);
 
             const handlePinSuccess = (p) => { 
                 const n = new Date();
                 if (pinState === "setup" || pinState === "change_new") { 
                     persist({...safeData, pin: p}); 
-                    setPinState("unlocked"); 
-                    setVY(n.getFullYear()); setVM(n.getMonth());
                 } 
-                else if (pinState === "verify") { 
-                    setPinState("unlocked"); 
-                    setVY(n.getFullYear()); setVM(n.getMonth());
-                } 
-                else if (pinState === "change_old") { 
-                    setPinState("change_new"); 
-                } 
+                setPinState("unlocked"); 
+                setVY(n.getFullYear()); setVM(n.getMonth());
+                setTab("summary");
             };
 
             const onUpdateClient = (oldN, newN) => { 
