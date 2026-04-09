@@ -555,7 +555,7 @@
             );
         }
 
-        // ─── ✨ 정산 탭 ───
+        // ─── 정산 탭 ───
         function SummaryTab({ entries, unpaidMap, year, month, onDelete, onEditEntry, allEntries, setHideHeader }) {
             const [selDay, setSelDay] = useState(null); 
             const [openClient, setOpenClient] = useState(null); 
@@ -725,7 +725,7 @@
             );
         }
 
-        // ─── ✨ 입금 탭 (전면 개편) ✨ ───
+        // ─── 입금 탭 ───
         function PaymentTab({ allEntries, monthKey, onTogglePaid, onToggleMultiplePaid, onPartialPay, onResetPay, payments }) {
             const byClient = {}; 
             
@@ -788,8 +788,8 @@
                         </div>
                         <div style={{ width: 1, background: "rgba(255,255,255,0.1)", margin: "0 16px" }} />
                         <div style={{ flex: 1, textAlign: "right", minWidth: 0 }}>
-                            <div style={{ fontSize: 13, color: "#f7768e", fontWeight: 700, marginBottom: 8 }}>남은 미수금</div>
-                            <div style={{ fontSize: 20, fontWeight: 900, color: "#f7768e", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{totalRemaining<0?`+${won(Math.abs(totalRemaining))}`:won(totalRemaining)}</div>
+                            <div style={{ fontSize: 13, color: "#7aa2f7", fontWeight: 700, marginBottom: 8 }}>남은 미수금</div>
+                            <div style={{ fontSize: 20, fontWeight: 900, color: "#7aa2f7", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{totalRemaining<0?`+${won(Math.abs(totalRemaining))}`:won(totalRemaining)}</div>
                         </div>
                     </div>
                     {rows.map(r => <PayRow key={r.client} {...r} monthKey={monthKey} onTogglePaid={onTogglePaid} onToggleMultiplePaid={onToggleMultiplePaid} onPartialPay={a => onPartialPay(r.client, monthKey, a)} onResetPay={() => onResetPay(r.client)} />)}
@@ -797,7 +797,7 @@
             );
         }
 
-        // ─── ✨ 입금 항목 (PayRow - 개별 체크 방식 도입) ✨ ───
+        // ─── ✨ 입금 항목 (PayRow - 수정 완료) ✨ ───
         function PayRow({ client, allItems, totalBilled, remaining, totalPayments, onTogglePaid, onToggleMultiplePaid, onPartialPay, onResetPay }) {
             const [open, setOpen] = useState(false); 
             const [val, setVal] = useState("");
@@ -815,18 +815,13 @@
             };
 
             return (
-                <div style={{ background: remaining <= 0 && allItems.length > 0 ? "rgba(26,27,38,0.5)" : "rgba(36,40,59,0.9)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: remaining <= 0 && allItems.length > 0 ? 0.6 : 1 }}>
+                <div style={{ background: remaining === 0 && allItems.length > 0 ? "rgba(26,27,38,0.5)" : "rgba(36,40,59,0.9)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: remaining === 0 && allItems.length > 0 ? 0.6 : 1 }}>
                     <div onClick={() => setOpen(!open)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 0 }}>
-                            <div style={{ width: 34, height: 34, borderRadius: "50%", background: remaining <= 0 ? "#9ece6a" : "rgba(0,0,0,0.3)", border: remaining <= 0 ? "none" : "2px solid #565f89", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                {remaining <= 0 && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f111a" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>}
-                            </div>
-                            <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
-                                <div style={{ fontSize: 18, fontWeight: 900, color: remaining <= 0 ? "#7a84a6" : "#fff", textDecoration: remaining <= 0 && totalBilled > 0 ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
-                            </div>
+                        <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
+                            <div style={{ fontSize: 18, fontWeight: 900, color: remaining === 0 ? "#7a84a6" : "#fff", textDecoration: remaining === 0 && totalBilled > 0 ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
                         </div>
                         <div style={{ flexShrink: 0, textAlign: "right", display: "flex", alignItems: "center", gap: 12 }}>
-                            <span style={{ fontSize: 22, fontWeight: 900, color: remaining <= 0 ? "#7a84a6" : "#f7768e", textDecoration: remaining <= 0 && totalBilled > 0 ? "line-through" : "none" }}>{remaining < 0 ? `+${won(Math.abs(remaining))}` : won(remaining)}</span>
+                            <span style={{ fontSize: 22, fontWeight: 900, color: remaining === 0 ? "#7a84a6" : "#7aa2f7", textDecoration: remaining === 0 && totalBilled > 0 ? "line-through" : "none" }}>{remaining < 0 ? `+${won(Math.abs(remaining))}` : won(remaining)}</span>
                             <span style={{ fontSize: 14, color: "#565f89", transform: open ? "rotate(180deg)" : "rotate(0)", transition: "0.3s" }}>▼</span>
                         </div>
                     </div>
@@ -1014,7 +1009,7 @@
             );
         }
 
-        // ─── ✨ 메인 앱 로직 ✨ ───
+        // ─── 메인 앱 로직 ───
         function MainApp({ data, persist, user }) {
             const safeData = sanitizeData(data);
             const [pinState, setPinState] = useState(safeData.pin ? "verify" : "setup");
@@ -1027,19 +1022,12 @@
             const [showSettings, setShowSettings] = useState(false);
             const [hideHeader, setHideHeader] = useState(false); 
 
-            // ✨ 화면 복귀 시 무조건 탭과 날짜를 초기화
             useEffect(() => { 
-                const handleVisibility = () => { 
-                    if (document.visibilityState === "visible") { 
-                        const n = new Date();
-                        setVY(n.getFullYear()); 
-                        setVM(n.getMonth());
-                        setTab("summary");
-                        if (safeData.pin) setPinState("verify"); 
-                    } 
-                }; 
-                document.addEventListener("visibilitychange", handleVisibility); 
-                return () => document.removeEventListener("visibilitychange", handleVisibility); 
+                const lockApp = () => { if (safeData.pin) setPinState("verify"); }; 
+                const hvc = () => { if (document.visibilityState==="hidden") lockApp(); }; 
+                document.addEventListener("visibilitychange", hvc); 
+                window.addEventListener("pagehide", lockApp); 
+                return () => { document.removeEventListener("visibilitychange", hvc); window.removeEventListener("pagehide", lockApp); }; 
             }, [safeData.pin]);
 
             const handlePinSuccess = (p) => { 
@@ -1096,12 +1084,10 @@
             const onPartialPay = (client, key, amount) => { const pk = `${key}::${client}`; persist({...safeData, payments: {...safeData.payments, [pk]: (safeData.payments[pk]||0)+amount}}); };
             const onResetPay = client => { const np = {...safeData.payments}; delete np[`${curMk}::${client}`]; persist({...safeData, payments: np}); };
             
-            // ✨ 개별 토글 결제 기능
             const onTogglePaid = (id, paid) => {
                 persist({...safeData, entries: safeData.entries.map(e => e.id === id ? {...e, paid} : e)});
             };
 
-            // ✨ 다중 토글 결제 기능 (전체 선택용)
             const onToggleMultiplePaid = (ids, paid) => {
                 const idSet = new Set(ids);
                 persist({...safeData, entries: safeData.entries.map(e => idSet.has(e.id) ? {...e, paid} : e)});
@@ -1126,7 +1112,6 @@
                     
                     <div style={{ flex: 1, padding: "0 20px 140px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
                         {tab==="summary" && <SummaryTab entries={monthEntries} unpaidMap={initialUnpaidMap} year={vY} month={vM} onDelete={setDel} onEditEntry={onEditEntry} allEntries={safeData.entries} setHideHeader={setHideHeader} />}
-                        {/* ✨ 새로운 PaymentTab으로 교체 */}
                         {tab==="payment" && <PaymentTab allEntries={safeData.entries} monthKey={curMk} onTogglePaid={onTogglePaid} onToggleMultiplePaid={onToggleMultiplePaid} onPartialPay={onPartialPay} onResetPay={onResetPay} payments={safeData.payments} />}
                     </div>
                     
@@ -1142,7 +1127,7 @@
                         <button onClick={() => setTab("payment")} style={{ flex: 1, height: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, position: "relative" }}>
                             {tab==="payment" && <div style={{ position: "absolute", inset: "10px 14px", background: "rgba(255,255,255,0.06)", borderRadius: 24, zIndex: -1 }} className="animate-fade" />}
                             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={tab==="payment"?"#9ece6a":"#565f89"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M5 6l4 12 3-8 3 8 4-12"/>
+                                <path d="M6 6l3 12 3-8 3 8 4-12"/>
                                 <path d="M4 11h16"/>
                                 <path d="M4 15h16"/>
                             </svg>
