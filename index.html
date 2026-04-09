@@ -50,10 +50,12 @@
         const amt = (e) => (e.discount ? -(Number(e.amount)||0) : (Number(e.amount)||0));
         const tag = (e) => (e.discount ? "할인" : e.desc || "작업");
         const fmt = (v) => { const n = String(v).replace(/[^0-9]/g, ""); return n ? parseInt(n, 10).toLocaleString("ko-KR") : ""; };
+        
         const today = () => { 
             const d = new Date(); 
             return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; 
         };
+        
         const getDDay = (deadline) => { 
             if (!deadline) return null; 
             try {
@@ -66,21 +68,28 @@
         };
 
         const sanitizeData = (raw) => {
-            if (!raw || typeof raw !== 'object') {
-                return { entries: [], clients: [], payments: {}, pin: null };
+            const defaultData = { entries: [], clients: [], payments: {}, pin: null };
+            try {
+                if (!raw || typeof raw !== 'object') return defaultData;
+
+                const safeEntries = Array.isArray(raw.entries) ? raw.entries.filter(e => {
+                    if (!e || typeof e !== 'object' || !e.id || !e.client || !e.date) return false;
+                    if (isNaN(new Date(e.date).getTime())) return false; 
+                    if (typeof e.amount !== 'number' || isNaN(e.amount)) return false; 
+                    return true;
+                }) : [];
+                
+                const uniqueEntries = Array.from(new Map(safeEntries.map(e => [e.id, e])).values());
+                
+                return { 
+                    entries: uniqueEntries, 
+                    clients: Array.isArray(raw.clients) ? raw.clients.filter(c => typeof c === 'string' && c.trim() !== '') : [], 
+                    payments: (raw.payments && typeof raw.payments === 'object') ? raw.payments : {}, 
+                    pin: typeof raw.pin === 'string' && raw.pin.length === 4 ? raw.pin : null 
+                };
+            } catch (error) {
+                return defaultData; 
             }
-            const safeEntries = Array.isArray(raw.entries) ? raw.entries.filter(e => {
-                if (!e || typeof e !== 'object' || !e.id || !e.client || !e.date) return false;
-                if (isNaN(new Date(e.date).getTime())) return false;
-                return true;
-            }) : [];
-            const uniqueEntries = Array.from(new Map(safeEntries.map(e => [e.id, e])).values());
-            return { 
-                entries: uniqueEntries, 
-                clients: Array.isArray(raw.clients) ? raw.clients.filter(c => typeof c === 'string' && c.trim() !== '') : [], 
-                payments: (raw.payments && typeof raw.payments === 'object') ? raw.payments : {}, 
-                pin: typeof raw.pin === 'string' && raw.pin.length === 4 ? raw.pin : null 
-            };
         };
           
         // ─── 글로벌 CSS 스타일 ───
@@ -269,7 +278,7 @@
             );
         }
           
-        // ─── 상단 헤더 (✨설정 아이콘 수정 완료) ───
+        // ─── 상단 헤더 ───
         function Header({ year, month, onPrev, onNext, onToday, onOpenSettings }) {
             return (
                 <div style={S.header}>
@@ -286,7 +295,6 @@
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                         </button>
                     </div>
-                    {/* ✨ 문제가 된 설정 아이콘 이미지를 깨끗한 새 아이콘으로 교체했습니다. */}
                     <button onClick={onOpenSettings} style={{...S.navBtn, width: 48, height: 48, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#a9b1d6"}}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
                     </button>
@@ -547,7 +555,7 @@
             );
         }
 
-        // ─── 정산 탭 ───
+        // ─── ✨ 정산 탭 ───
         function SummaryTab({ entries, unpaidMap, year, month, onDelete, onEditEntry, allEntries, setHideHeader }) {
             const [selDay, setSelDay] = useState(null); 
             const [openClient, setOpenClient] = useState(null); 
@@ -717,107 +725,147 @@
             );
         }
 
-        // ─── 입금 탭 ───
-        function PaymentTab({ entries, unpaidMap, endOfMonthUnpaidMap, onFullCheck, onPartialPay, onResetPay, monthKey, payments }) {
+        // ─── ✨ 입금 탭 (전면 개편) ✨ ───
+        function PaymentTab({ allEntries, monthKey, onTogglePaid, onToggleMultiplePaid, onPartialPay, onResetPay, payments }) {
             const byClient = {}; 
-            (entries||[]).forEach(e => { 
-                if (!byClient[e.client]) byClient[e.client] = []; 
-                byClient[e.client].push(e); 
-            });
-            const allClients = [...new Set([...Object.keys(byClient), ...Object.keys(unpaidMap||{})])];
             
-            const rows = allClients.map(client => {
-                const items = byClient[client]||[]; 
-                const thisTotal = items.reduce((s,e) => s+amt(e), 0);
-                const unpaid = (unpaidMap||{})[client]||0; 
-                const endUnpaid = (endOfMonthUnpaidMap||{})[client]||0; 
-                const total = thisTotal+unpaid;
+            allEntries.forEach(e => { 
+                try {
+                    const d = new Date(e.date); 
+                    if(isNaN(d.getTime())) return;
+                    const eMk = mk(d.getFullYear(), d.getMonth()); 
+                    if (eMk > monthKey) return; 
+
+                    if (!byClient[e.client]) byClient[e.client] = { current: [], pastUnpaid: [] }; 
+                    if (eMk === monthKey) {
+                        byClient[e.client].current.push(e);
+                    } else if (!e.paid) {
+                        byClient[e.client].pastUnpaid.push(e);
+                    }
+                } catch {}
+            });
+
+            Object.keys(payments || {}).forEach(pk => {
+                const parts = pk.split("::");
+                if (parts.length === 2 && parts[0] <= monthKey) {
+                    const client = parts[1];
+                    if (!byClient[client]) byClient[client] = { current: [], pastUnpaid: [] };
+                }
+            });
+
+            const rows = Object.keys(byClient).map(client => {
+                const currentItems = byClient[client].current;
+                const pastUnpaidItems = byClient[client].pastUnpaid;
+                const allItems = [...pastUnpaidItems, ...currentItems].sort((a,b) => new Date(a.date) - new Date(b.date));
+
+                let totalPayments = 0;
+                Object.entries(payments || {}).forEach(([pk, val]) => {
+                    const parts = pk.split("::");
+                    if (parts.length === 2 && parts[1] === client && parts[0] <= monthKey) {
+                        totalPayments += (Number(val) || 0);
+                    }
+                });
+
+                const totalBilled = allItems.reduce((s, e) => s + amt(e), 0);
+                const remaining = allItems.filter(e => !e.paid).reduce((s, e) => s + amt(e), 0) - totalPayments;
                 
-                if (items.length===0 && unpaid===0 && endUnpaid===0) return null;
-                
-                const paid = items.length>0 && items.every(e => e.paid); 
-                const paidAmt = (payments&&payments[`${monthKey}::${client}`])||0;
-                const done = (items.length===0||paid) && endUnpaid<=0; 
-                const isFullyPaid = done||(total>0&&paidAmt>=total)||endUnpaid<=0;
-                
-                return { client, items, thisTotal, unpaid, total, paid, paidAmt, endUnpaid, isFullyPaid };
+                if (allItems.length === 0 && totalPayments === 0) return null;
+
+                return { client, allItems, totalBilled, remaining, totalPayments };
             }).filter(Boolean);
 
-            const totalDue = rows.reduce((s,r) => s+r.total, 0);
-            const totalPaid = rows.reduce((s,r) => s+(r.paidAmt||0)+(r.paid&&r.items.length>0?r.thisTotal:0), 0);
-            
-            if (rows.length===0) return <div className="animate-fade" style={S.card}><div style={S.empty}>이번 달 기록이 없습니다.</div></div>;
+            const totalRemaining = rows.reduce((s,r) => s+r.remaining, 0);
+            const grandTotalBilled = rows.reduce((s,r) => s+r.totalBilled, 0);
+
+            if (rows.length===0) return <div className="animate-fade" style={S.card}><div style={S.empty}>이번 달 입금/청구 내역이 없습니다.</div></div>;
             
             return (
                 <div className="animate-fade">
                     <div style={{ background: "rgba(36,40,59,0.6)", borderRadius: 24, padding: "24px 20px", marginBottom: 24, border: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between" }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>총 정산액</div>
-                            <div style={{ fontSize: 20, fontWeight: 900, color: "#c0caf5", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{totalDue<0?`-${won(Math.abs(totalDue))}`:won(totalDue)}</div>
+                            <div style={{ fontSize: 13, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>총 청구액</div>
+                            <div style={{ fontSize: 20, fontWeight: 900, color: "#c0caf5", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{won(grandTotalBilled)}</div>
                         </div>
                         <div style={{ width: 1, background: "rgba(255,255,255,0.1)", margin: "0 16px" }} />
                         <div style={{ flex: 1, textAlign: "right", minWidth: 0 }}>
-                            <div style={{ fontSize: 13, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>완료된 입금</div>
-                            <div style={{ fontSize: 20, fontWeight: 900, color: "#9ece6a", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{won(totalPaid)}</div>
+                            <div style={{ fontSize: 13, color: "#f7768e", fontWeight: 700, marginBottom: 8 }}>남은 미수금</div>
+                            <div style={{ fontSize: 20, fontWeight: 900, color: "#f7768e", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{totalRemaining<0?`+${won(Math.abs(totalRemaining))}`:won(totalRemaining)}</div>
                         </div>
                     </div>
-                    {rows.map(r => <PayRow key={r.client} {...r} onCheck={() => onFullCheck(r.client, monthKey, !r.isFullyPaid)} onPay={a => onPartialPay(r.client, monthKey, a)} onReset={() => onResetPay(r.client)} />)}
+                    {rows.map(r => <PayRow key={r.client} {...r} monthKey={monthKey} onTogglePaid={onTogglePaid} onToggleMultiplePaid={onToggleMultiplePaid} onPartialPay={a => onPartialPay(r.client, monthKey, a)} onResetPay={() => onResetPay(r.client)} />)}
                 </div>
             );
         }
 
-        // ─── 입금 항목 (PayRow) ───
-        function PayRow({ client, total, thisTotal, unpaid, isFullyPaid, paidAmt, endUnpaid, items, onCheck, onPay, onReset }) {
+        // ─── ✨ 입금 항목 (PayRow - 개별 체크 방식 도입) ✨ ───
+        function PayRow({ client, allItems, totalBilled, remaining, totalPayments, onTogglePaid, onToggleMultiplePaid, onPartialPay, onResetPay }) {
             const [open, setOpen] = useState(false); 
             const [val, setVal] = useState("");
 
+            const allPaid = allItems.length > 0 && allItems.every(e => e.paid);
+
             const go = () => { 
                 const r = parseInt(val.replace(/,/g,""),10); 
-                if(!isNaN(r) && r>0){ onPay(r); setVal(""); setOpen(false); }
+                if(!isNaN(r) && r>0){ onPartialPay(r); setVal(""); }
+            };
+
+            const handleToggleAll = (e) => {
+                e.stopPropagation();
+                onToggleMultiplePaid(allItems.map(i => i.id), !allPaid);
             };
 
             return (
-                <div style={{ background: isFullyPaid?"rgba(26,27,38,0.5)":"rgba(36,40,59,0.9)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: isFullyPaid?0.6:1 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <label style={{ display: "flex", alignItems: "center", gap: 16, cursor: "pointer", flex: 1 }}>
-                            <div style={{ width: 34, height: 34, borderRadius: "50%", background: isFullyPaid?"#9ece6a":"rgba(0,0,0,0.3)", border: isFullyPaid?"none":"2px solid #565f89", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                <input type="checkbox" checked={isFullyPaid} onChange={onCheck} style={{ opacity: 0, position: "absolute", width: 34, height: 34, cursor: "pointer" }} />
-                                {isFullyPaid && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f111a" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>}
+                <div style={{ background: remaining <= 0 && allItems.length > 0 ? "rgba(26,27,38,0.5)" : "rgba(36,40,59,0.9)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: remaining <= 0 && allItems.length > 0 ? 0.6 : 1 }}>
+                    <div onClick={() => setOpen(!open)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 0 }}>
+                            <div style={{ width: 34, height: 34, borderRadius: "50%", background: remaining <= 0 ? "#9ece6a" : "rgba(0,0,0,0.3)", border: remaining <= 0 ? "none" : "2px solid #565f89", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                {remaining <= 0 && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f111a" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>}
                             </div>
                             <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
-                                <div style={{ fontSize: 18, fontWeight: 900, color: isFullyPaid?"#7a84a6":"#fff", textDecoration: isFullyPaid&&total>0?"line-through":"none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
-                                {unpaid>0 && <div style={{ fontSize: 11, color: "#e0af68", marginTop: 4, fontWeight: 700 }}>미정산 이월 포함됨</div>}
-                                {unpaid<0 && <div style={{ fontSize: 11, color: "#9ece6a", marginTop: 4, fontWeight: 700 }}>선지급 차감됨 (+{won(Math.abs(unpaid))})</div>}
+                                <div style={{ fontSize: 18, fontWeight: 900, color: remaining <= 0 ? "#7a84a6" : "#fff", textDecoration: remaining <= 0 && totalBilled > 0 ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
                             </div>
-                        </label>
-                        <div style={{ flexShrink: 0, textAlign: "right" }}>
-                            <span style={{ fontSize: 22, fontWeight: 900, color: isFullyPaid?"#7a84a6":"#7aa2f7", textDecoration: isFullyPaid&&total>0?"line-through":"none" }}>{total<0?`-${won(Math.abs(total))}`:won(total)}</span>
+                        </div>
+                        <div style={{ flexShrink: 0, textAlign: "right", display: "flex", alignItems: "center", gap: 12 }}>
+                            <span style={{ fontSize: 22, fontWeight: 900, color: remaining <= 0 ? "#7a84a6" : "#f7768e", textDecoration: remaining <= 0 && totalBilled > 0 ? "line-through" : "none" }}>{remaining < 0 ? `+${won(Math.abs(remaining))}` : won(remaining)}</span>
+                            <span style={{ fontSize: 14, color: "#565f89", transform: open ? "rotate(180deg)" : "rotate(0)", transition: "0.3s" }}>▼</span>
                         </div>
                     </div>
                     
-                    {paidAmt>0 && (
-                        <div className="animate-fade" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 16, borderTop: "1px dashed rgba(255,255,255,0.1)" }}>
-                            {endUnpaid<0 
-                                ? <span style={{ fontSize: 13, color: "#9ece6a", fontWeight: 800 }}>정산 후 남은 금액(선지급): +{won(Math.abs(endUnpaid))}</span> 
-                                : <span style={{ fontSize: 14, color: isFullyPaid?"#7aa2f7":"#9ece6a", fontWeight: 800 }}>누적 입금: {won(paidAmt)}</span>}
-                            <button onClick={onReset} style={{ background: "rgba(231,76,60,0.15)", border: "none", borderRadius: 10, color: "#e74c3c", fontSize: 13, fontWeight: 800, padding: "8px 14px", cursor: "pointer", flexShrink: 0 }}>취소</button>
-                        </div>
-                    )}
-                    
-                    {!isFullyPaid && (
-                        <div style={{ marginTop: 16 }}>
-                            {!open ? (
-                                <button onClick={() => setOpen(true)} style={S.partialBtn}>+ 분할 입금액 추가</button>
-                            ) : (
-                                <div className="animate-slide">
-                                    <div style={{ display: "flex", gap: 10 }}>
-                                        <input value={val} onChange={e => setVal(fmt(e.target.value))} placeholder="입금된 금액" inputMode="numeric" style={{...S.partialInput, minWidth: 0}} onKeyDown={e => e.key==="Enter"&&go()} autoFocus />
-                                        <button onClick={go} style={{ padding: "0 20px", background: "#7aa2f7", border: "none", borderRadius: 14, color: "#0f111a", fontWeight: 900, fontSize: 16, flexShrink: 0 }}>확인</button>
-                                        <button onClick={() => { setOpen(false); setVal(""); }} style={{ padding: "0 16px", background: "rgba(0,0,0,0.3)", border: "none", borderRadius: 14, color: "#a9b1d6", fontWeight: 800, flexShrink: 0 }}>취소</button>
-                                    </div>
-                                    <QuickBtns val={val} setVal={setVal} />
+                    {open && (
+                        <div className="animate-slide" style={{ marginTop: 20, paddingTop: 8, borderTop: "1px dashed rgba(255,255,255,0.1)" }}>
+                            {allItems.length > 0 && (
+                                <label style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                    <input type="checkbox" checked={allPaid} onChange={handleToggleAll} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer" }} />
+                                    <span style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>전체 선택</span>
+                                </label>
+                            )}
+                            
+                            {allItems.map(item => {
+                                const d = new Date(item.date);
+                                const m = isNaN(d.getTime()) ? "" : `${d.getMonth() + 1}월 `;
+                                return (
+                                    <label key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                        <input type="checkbox" checked={item.paid} onChange={() => onTogglePaid(item.id, !item.paid)} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer", flexShrink: 0 }} />
+                                        <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                            <div style={{ fontSize: 15, fontWeight: 600, color: item.paid ? "#565f89" : "#c0caf5", textDecoration: item.paid ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m}{tag(item)}</div>
+                                            <div style={{ fontSize: 15, fontWeight: 800, color: item.paid ? "#565f89" : (item.discount ? "#f7768e" : "#fff"), textDecoration: item.paid ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{item.discount ? "-" : ""}{won(item.amount)}</div>
+                                        </div>
+                                    </label>
+                                );
+                            })}
+
+                            {totalPayments > 0 && (
+                                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginTop: 16 }}>
+                                    <span style={{ fontSize: 14, color: "#9ece6a", fontWeight: 800 }}>누적 분할 입금: {won(totalPayments)}</span>
+                                    <button onClick={onResetPay} style={{ background: "rgba(231,76,60,0.15)", border: "none", borderRadius: 10, color: "#e74c3c", fontSize: 13, fontWeight: 800, padding: "8px 14px", cursor: "pointer" }}>취소</button>
                                 </div>
                             )}
+
+                            <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
+                                <input value={val} onChange={e => setVal(fmt(e.target.value))} placeholder="분할 입금액 추가" inputMode="numeric" style={{...S.partialInput, minWidth: 0, padding: "12px 16px"}} onKeyDown={e => e.key==="Enter"&&go()} />
+                                <button onClick={go} style={{ padding: "0 20px", background: "#7aa2f7", border: "none", borderRadius: 14, color: "#0f111a", fontWeight: 900, fontSize: 15, flexShrink: 0 }}>확인</button>
+                            </div>
+                            <QuickBtns val={val} setVal={setVal} />
                         </div>
                     )}
                 </div>
@@ -966,7 +1014,7 @@
             );
         }
 
-        // ─── 메인 앱 로직 ───
+        // ─── ✨ 메인 앱 로직 ✨ ───
         function MainApp({ data, persist, user }) {
             const safeData = sanitizeData(data);
             const [pinState, setPinState] = useState(safeData.pin ? "verify" : "setup");
@@ -979,12 +1027,19 @@
             const [showSettings, setShowSettings] = useState(false);
             const [hideHeader, setHideHeader] = useState(false); 
 
+            // ✨ 화면 복귀 시 무조건 탭과 날짜를 초기화
             useEffect(() => { 
-                const lockApp = () => { if (safeData.pin) setPinState("verify"); }; 
-                const hvc = () => { if (document.visibilityState==="hidden") lockApp(); }; 
-                document.addEventListener("visibilitychange", hvc); 
-                window.addEventListener("pagehide", lockApp); 
-                return () => { document.removeEventListener("visibilitychange", hvc); window.removeEventListener("pagehide", lockApp); }; 
+                const handleVisibility = () => { 
+                    if (document.visibilityState === "visible") { 
+                        const n = new Date();
+                        setVY(n.getFullYear()); 
+                        setVM(n.getMonth());
+                        setTab("summary");
+                        if (safeData.pin) setPinState("verify"); 
+                    } 
+                }; 
+                document.addEventListener("visibilitychange", handleVisibility); 
+                return () => document.removeEventListener("visibilitychange", handleVisibility); 
             }, [safeData.pin]);
 
             const handlePinSuccess = (p) => { 
@@ -1040,21 +1095,18 @@
             const onNewClient = name => { if (!safeData.clients.includes(name)) persist({...safeData, clients: [...safeData.clients, name]}); };
             const onPartialPay = (client, key, amount) => { const pk = `${key}::${client}`; persist({...safeData, payments: {...safeData.payments, [pk]: (safeData.payments[pk]||0)+amount}}); };
             const onResetPay = client => { const np = {...safeData.payments}; delete np[`${curMk}::${client}`]; persist({...safeData, payments: np}); };
-            const onFullCheck = (client, key, check) => { 
-                let ent = safeData.entries; 
-                let pay = {...safeData.payments}; 
-                const pk = `${key}::${client}`; 
-                if (check) { 
-                    ent = ent.map(e => { const d = new Date(e.date); return e.client===client&&mk(d.getFullYear(),d.getMonth())===key?{...e, paid: true}:e; }); 
-                    const tempBal = calcBalance(ent, pay, nextMonthMk); 
-                    const remaining = tempBal[client]||0; 
-                    if (remaining>0) pay[pk] = (pay[pk]||0)+remaining; 
-                } else { 
-                    ent = ent.map(e => { const d = new Date(e.date); return e.client===client&&mk(d.getFullYear(),d.getMonth())===key?{...e, paid: false}:e; }); 
-                    delete pay[pk]; 
-                } 
-                persist({...safeData, entries: ent, payments: pay}); 
+            
+            // ✨ 개별 토글 결제 기능
+            const onTogglePaid = (id, paid) => {
+                persist({...safeData, entries: safeData.entries.map(e => e.id === id ? {...e, paid} : e)});
             };
+
+            // ✨ 다중 토글 결제 기능 (전체 선택용)
+            const onToggleMultiplePaid = (ids, paid) => {
+                const idSet = new Set(ids);
+                persist({...safeData, entries: safeData.entries.map(e => idSet.has(e.id) ? {...e, paid} : e)});
+            };
+
             const onDelete = entry => { 
                 const ent = safeData.entries.filter(e => e.id!==entry.id); 
                 persist({...safeData, entries: ent, payments: cleanPay(safeData.payments, new Set(ent.map(e => e.client)))}); 
@@ -1074,7 +1126,8 @@
                     
                     <div style={{ flex: 1, padding: "0 20px 140px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
                         {tab==="summary" && <SummaryTab entries={monthEntries} unpaidMap={initialUnpaidMap} year={vY} month={vM} onDelete={setDel} onEditEntry={onEditEntry} allEntries={safeData.entries} setHideHeader={setHideHeader} />}
-                        {tab==="payment" && <PaymentTab entries={monthEntries} unpaidMap={initialUnpaidMap} endOfMonthUnpaidMap={endOfMonthUnpaidMap} onFullCheck={onFullCheck} onPartialPay={onPartialPay} onResetPay={onResetPay} monthKey={curMk} payments={safeData.payments} />}
+                        {/* ✨ 새로운 PaymentTab으로 교체 */}
+                        {tab==="payment" && <PaymentTab allEntries={safeData.entries} monthKey={curMk} onTogglePaid={onTogglePaid} onToggleMultiplePaid={onToggleMultiplePaid} onPartialPay={onPartialPay} onResetPay={onResetPay} payments={safeData.payments} />}
                     </div>
                     
                     <div style={{ position: "fixed", bottom: "max(24px, env(safe-area-inset-bottom))", left: 20, right: 20, maxWidth: 440, margin: "0 auto", height: 76, background: "rgba(26,27,38,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderRadius: 38, border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px", zIndex: 30, boxShadow: "0 24px 48px rgba(0,0,0,0.5)" }}>
