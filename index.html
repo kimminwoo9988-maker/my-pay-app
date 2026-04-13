@@ -304,24 +304,42 @@
           
         function TotalDashboard({ current, unpaidMap }) {
             let sumUnpaid = 0; let sumPrepaid = 0;
-            Object.values(unpaidMap || {}).forEach(v => { 
-                if (v > 0) sumUnpaid += v; 
-                else if (v < 0) sumPrepaid += Math.abs(v); 
+            Object.values(unpaidMap || {}).forEach(v => {
+                if (v > 0) sumUnpaid += v;
+                else if (v < 0) sumPrepaid += Math.abs(v);
             });
             const finalTotal = (current || 0) + sumUnpaid - sumPrepaid;
 
+            const steps = [
+                { label: "이번달 작업", value: current || 0, color: "#7aa2f7", sign: "" },
+                ...(sumUnpaid > 0 ? [{ label: "미정산 이월", value: sumUnpaid, color: "#e0af68", sign: "+" }] : []),
+                ...(sumPrepaid > 0 ? [{ label: "선지급 차감", value: sumPrepaid, color: "#9ece6a", sign: "−" }] : []),
+            ];
+
             return (
-                <div style={{ ...S.card, padding: "28px 20px", marginBottom: 24, background: "linear-gradient(145deg, #1f2233 0%, #161824 100%)", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
-                    <span style={{ fontSize: 14, color: "#8a94b5", fontWeight: 700, marginBottom: 8, letterSpacing: "0.5px" }}>이번 달 최종 정산액</span>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                        <span style={{ fontSize: 36, fontWeight: 900, color: finalTotal < 0 ? "#f7768e" : "#fff", letterSpacing: "-1px" }}>
-                            {finalTotal < 0 ? "-" : ""}{Math.abs(finalTotal).toLocaleString("ko-KR")}
-                        </span>
-                        <span style={{ fontSize: 18, fontWeight: 700, color: finalTotal < 0 ? "#f7768e" : "#7aa2f7" }}>원</span>
-                    </div>
-                    <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-                        {sumUnpaid > 0 && <div style={{ padding: "6px 14px", background: "rgba(224, 175, 104, 0.15)", borderRadius: 10, display: "flex", gap: 6, alignItems: "center" }}><span style={{ fontSize: 12, color: "#e0af68", fontWeight: 700 }}>미정산 이월</span><span style={{ fontSize: 13, color: "#e0af68", fontWeight: 900 }}>+{sumUnpaid.toLocaleString("ko-KR")}원</span></div>}
-                        {sumPrepaid > 0 && <div style={{ padding: "6px 14px", background: "rgba(158, 206, 106, 0.15)", borderRadius: 10, display: "flex", gap: 6, alignItems: "center" }}><span style={{ fontSize: 12, color: "#9ece6a", fontWeight: 700 }}>선지급 차감됨</span><span style={{ fontSize: 13, color: "#9ece6a", fontWeight: 900 }}>-{sumPrepaid.toLocaleString("ko-KR")}원</span></div>}
+                <div style={{ ...S.card, padding: "22px 20px", marginBottom: 24, background: "linear-gradient(145deg, #1f2233 0%, #161824 100%)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <span style={{ fontSize: 13, color: "#8a94b5", fontWeight: 700, letterSpacing: "0.5px", display: "block", marginBottom: 14 }}>이번 달 최종 정산액</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                        {steps.map((step, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i < steps.length - 1 ? "1px dashed rgba(255,255,255,0.07)" : "none" }}>
+                                <div style={{ width: 4, height: 26, borderRadius: 2, background: step.color, flexShrink: 0 }} />
+                                <span style={{ flex: 1, fontSize: 13, color: "#8a94b5", fontWeight: 700 }}>{step.label}</span>
+                                <span style={{ fontSize: 14, fontWeight: 900, color: step.color }}>
+                                    {step.sign}{Math.abs(step.value).toLocaleString("ko-KR")}원
+                                </span>
+                            </div>
+                        ))}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0 0" }}>
+                            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }} />
+                            <span style={{ fontSize: 10, color: "#565f89" }}>▼</span>
+                            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 4, justifyContent: "flex-end", paddingTop: 10 }}>
+                            <span style={{ fontSize: 34, fontWeight: 900, color: finalTotal < 0 ? "#f7768e" : "#fff", letterSpacing: "-1px" }}>
+                                {finalTotal < 0 ? "-" : ""}{Math.abs(finalTotal).toLocaleString("ko-KR")}
+                            </span>
+                            <span style={{ fontSize: 18, fontWeight: 700, color: finalTotal < 0 ? "#f7768e" : "#7aa2f7" }}>원</span>
+                        </div>
                     </div>
                 </div>
             );
@@ -368,12 +386,20 @@
         }
 
         // ─── 프리미엄 Invoice 정산서 ───
-        function ReceiptModal({ client, month, year, items, unpaid, unpaidItems, onClose }) {
+        function ReceiptModal({ client, month, year, items, unpaid, unpaidItems, payments, curMk, onClose }) {
             const [isProcessing, setIsProcessing] = useState(false);
             const currentTotal = items.reduce((s, e) => s + amt(e), 0);
             const finalTotal = currentTotal + unpaid;
             const d = new Date();
             const todayStr = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")}`;
+            // 입금 내역 계산
+            const totalPartialPaid = Object.entries(payments || {}).filter(([pk]) => {
+                const parts = pk.split("::");
+                return parts.length === 2 && parts[1] === client && parts[0] <= (curMk || "");
+            }).reduce((s, [, v]) => s + (Number(v) || 0), 0);
+            const paidItemsAmt = items.filter(e => e.paid).reduce((s, e) => s + amt(e), 0);
+            const totalReceived = totalPartialPaid + paidItemsAmt;
+            const remainingAfterPay = Math.max(0, finalTotal - totalPartialPaid);
 
             const finalTotalStr = isNaN(finalTotal) ? "0" : (finalTotal < 0 ? "0" : Math.abs(finalTotal).toLocaleString("ko-KR"));
             const dueFontSize = finalTotalStr.length > 11 ? 20 : finalTotalStr.length > 8 ? 24 : 30;
@@ -396,6 +422,10 @@
                 }
                 if (unpaid < 0) lines.push("", "선지급 차감: -"+won(Math.abs(unpaid)));
                 lines.push("", "총 청구액: "+(finalTotal<0?"0원 (선지급 잔액 +"+won(Math.abs(finalTotal))+")":won(finalTotal)));
+                if (totalReceived > 0) {
+                    lines.push("입금 완료: -"+won(totalReceived));
+                    lines.push("청구 잔액: "+won(remainingAfterPay));
+                }
                 
                 try { await navigator.clipboard.writeText(lines.join("\n")); alert("복사되었습니다!"); } 
                 catch { alert("복사 실패"); }
@@ -481,13 +511,27 @@
                                 </div>
                             </div>
 
-                            <div style={{ background: "#111", borderRadius: 12, padding: "24px", marginBottom: 36, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 10px 20px rgba(0,0,0,0.08)" }}>
+                            <div style={{ background: "#111", borderRadius: 12, padding: "24px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 10px 20px rgba(0,0,0,0.08)" }}>
                                 <span style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: "2px", flexShrink: 0 }}>TOTAL DUE</span>
                                 <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 1, minWidth: 0, marginLeft: 12 }}>
                                     <span style={{ fontSize: dueFontSize, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>{finalTotalStr}<span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>원</span></span>
                                     {finalTotal < 0 && <div style={{ fontSize: 11, color: "#9ece6a", fontWeight: 800, marginTop: 4, whiteSpace: "normal" }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}
                                 </div>
                             </div>
+
+                            {totalReceived > 0 && (
+                                <div style={{ background: "#f0ece4", borderRadius: 10, padding: "14px 18px", marginBottom: 28 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                                        <span style={{ fontSize: 11, fontWeight: 800, color: "#888", letterSpacing: "1px" }}>입금 완료</span>
+                                        <span style={{ fontSize: 14, fontWeight: 900, color: "#4a7c59" }}>-{totalReceived.toLocaleString("ko-KR")}원</span>
+                                    </div>
+                                    <div style={{ height: 1, background: "#ddd", marginBottom: 8 }} />
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ fontSize: 11, fontWeight: 800, color: "#888", letterSpacing: "1px" }}>청구 잔액</span>
+                                        <span style={{ fontSize: 16, fontWeight: 900, color: "#111" }}>{remainingAfterPay.toLocaleString("ko-KR")}원</span>
+                                    </div>
+                                </div>
+                            )}
 
                             <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 28 }}>
                                 <thead>
@@ -556,8 +600,77 @@
             );
         }
 
+        // ─── 월간 통계 ───
+        function MonthlyStats({ grandTotal, prevGrandTotal, groups, allClients }) {
+            const [open, setOpen] = useState(false);
+            const diff = grandTotal - prevGrandTotal;
+            const pct = prevGrandTotal > 0 ? Math.round((diff / prevGrandTotal) * 100) : null;
+            const clientsWithWork = allClients.filter(name => groups[name] && groups[name].total > 0);
+
+            return (
+                <div style={{ ...S.card, marginBottom: 24, overflow: "hidden" }}>
+                    <button onClick={() => setOpen(!open)} style={{ width: "100%", background: "none", border: "none", padding: "16px 20px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7aa2f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                            <span style={{ fontSize: 15, fontWeight: 800, color: "#c0caf5" }}>월간 통계</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            {pct !== null && (
+                                <span style={{ fontSize: 12, fontWeight: 800, color: diff >= 0 ? "#9ece6a" : "#f7768e", background: diff >= 0 ? "rgba(158,206,106,0.15)" : "rgba(247,118,142,0.15)", padding: "3px 10px", borderRadius: 8 }}>
+                                    {diff >= 0 ? "▲" : "▼"} {Math.abs(pct)}%
+                                </span>
+                            )}
+                            <span style={{ color: "#565f89", fontSize: 12, display: "inline-block", transition: "transform 0.3s", transform: open ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
+                        </div>
+                    </button>
+
+                    {open && (
+                        <div className="animate-slide" style={{ padding: "0 20px 20px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                            <div style={{ display: "flex", gap: 10, margin: "16px 0" }}>
+                                <div style={{ flex: 1, background: "rgba(0,0,0,0.3)", borderRadius: 14, padding: "14px 16px" }}>
+                                    <div style={{ fontSize: 11, color: "#565f89", fontWeight: 700, marginBottom: 6 }}>지난달</div>
+                                    <div style={{ fontSize: 16, fontWeight: 900, color: "#8a94b5" }}>{won(prevGrandTotal)}</div>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                                    <span style={{ fontSize: 18, color: diff >= 0 ? "#9ece6a" : "#f7768e" }}>→</span>
+                                </div>
+                                <div style={{ flex: 1, background: "rgba(122,162,247,0.1)", borderRadius: 14, padding: "14px 16px", border: "1px solid rgba(122,162,247,0.2)" }}>
+                                    <div style={{ fontSize: 11, color: "#7aa2f7", fontWeight: 700, marginBottom: 6 }}>이번달</div>
+                                    <div style={{ fontSize: 16, fontWeight: 900, color: "#fff" }}>{won(grandTotal)}</div>
+                                </div>
+                            </div>
+
+                            {grandTotal > 0 && clientsWithWork.length > 0 && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                    <div style={{ fontSize: 12, color: "#565f89", fontWeight: 700 }}>업체별 비중</div>
+                                    {clientsWithWork.map((name, i) => {
+                                        const clientTotal = groups[name].total;
+                                        const sharePct = Math.max(1, Math.round((clientTotal / grandTotal) * 100));
+                                        const color = COLORS[i % COLORS.length];
+                                        return (
+                                            <div key={name}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                                                    <span style={{ fontSize: 13, fontWeight: 700, color: "#c0caf5" }}>{name}</span>
+                                                    <span style={{ fontSize: 13, fontWeight: 900, color }}>
+                                                        {sharePct}%<span style={{ fontSize: 11, color: "#8a94b5", fontWeight: 700 }}> ({won(clientTotal)})</span>
+                                                    </span>
+                                                </div>
+                                                <div style={{ height: 6, background: "rgba(255,255,255,0.07)", borderRadius: 3 }}>
+                                                    <div style={{ height: "100%", width: `${sharePct}%`, background: color, borderRadius: 3, transition: "width 0.6s ease" }} />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         // ─── 정산 탭 ───
-        function SummaryTab({ entries, unpaidMap, year, month, onDelete, onEditEntry, allEntries, setHideHeader }) {
+        function SummaryTab({ entries, unpaidMap, year, month, onDelete, onEditEntry, allEntries, setHideHeader, payments }) {
             const [selDay, setSelDay] = useState(null); 
             const [openClient, setOpenClient] = useState(null); 
             const [receiptClient, setReceiptClient] = useState(null);
@@ -574,6 +687,15 @@
             });
             const grandTotal = (entries||[]).reduce((s, e) => s + amt(e), 0);
             const allClients = [...new Set([...Object.keys(groups), ...Object.keys(unpaidMap || {})])];
+
+            // 지난달 비교
+            const prevY = month === 0 ? year - 1 : year;
+            const prevM = month === 0 ? 11 : month - 1;
+            const prevMonthEntries = (allEntries || []).filter(e => {
+                try { const d = new Date(e.date); return !isNaN(d.getTime()) && d.getFullYear() === prevY && d.getMonth() === prevM; }
+                catch { return false; }
+            });
+            const prevGrandTotal = prevMonthEntries.reduce((s, e) => s + amt(e), 0);
             
             const deadlines = (entries||[]).filter(e => {
                 if (!e.deadline || e.paid) return false;
@@ -599,6 +721,7 @@
             return (
                 <div className="animate-fade">
                     <TotalDashboard current={grandTotal} unpaidMap={unpaidMap} />
+                    <MonthlyStats grandTotal={grandTotal} prevGrandTotal={prevGrandTotal} groups={groups} allClients={allClients} />
                     
                     {deadlines.length > 0 && (
                         <div style={{ marginBottom: 24, padding: "0 4px" }}>
@@ -651,9 +774,11 @@
                             if (total===0 && !g) return null;
                             const isOpen = openClient===name; 
                             const items = g?g.items:[];
+                            
+                            const statusColor = un > 0 ? "#e0af68" : un < 0 ? "#9ece6a" : "#565f89";
 
                             return (
-                                <div key={name} style={{ background: isOpen?"rgba(36,40,59,0.9)":"rgba(36,40,59,0.5)", borderRadius: 18, border: "1px solid rgba(255,255,255,0.05)", borderLeft: `5px solid #7aa2f7`, overflow: "hidden", transition: "all 0.3s" }}>
+                                <div key={name} style={{ background: isOpen?"rgba(36,40,59,0.9)":"rgba(36,40,59,0.5)", borderRadius: 18, border: "1px solid rgba(255,255,255,0.05)", borderLeft: `5px solid ${statusColor}`, overflow: "hidden", transition: "all 0.3s" }}>
                                     <div onClick={() => setOpenClient(isOpen?null:name)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 16px", cursor: "pointer" }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                                             <span style={{ fontSize: 17, fontWeight: 800, color: "#fff" }}>{name}</span>
@@ -717,7 +842,7 @@
                             if (isNaN(d.getTime())) return false;
                             return e.client === receiptClient && mk(d.getFullYear(), d.getMonth()) < curMk && !e.paid;
                         });
-                        return <ReceiptModal client={receiptClient} month={month} year={year} items={groups[receiptClient]?.items || []} unpaid={(unpaidMap||{})[receiptClient]||0} unpaidItems={clientUnpaidItems} onClose={() => setReceiptClient(null)} />;
+                        return <ReceiptModal client={receiptClient} month={month} year={year} items={groups[receiptClient]?.items || []} unpaid={(unpaidMap||{})[receiptClient]||0} unpaidItems={clientUnpaidItems} payments={payments} curMk={curMk} onClose={() => setReceiptClient(null)} />;
                     })()}
                 </div>
             );
@@ -725,6 +850,7 @@
 
         // ─── 입금 탭 ───
         function PaymentTab({ allEntries, monthKey, onTogglePaid, onToggleMultiplePaid, onPartialPay, onResetPay, payments }) {
+            const [hideSettled, setHideSettled] = useState(false);
             const byClient = {}; 
             
             allEntries.forEach(e => { 
@@ -778,21 +904,50 @@
             if (rows.length===0) return <div className="animate-fade" style={S.card}><div style={S.empty}>이번 달 입금/청구 내역이 없습니다.</div></div>;
             
             const totalRemainingColor = totalRemaining < 0 ? "#9ece6a" : "#f7768e";
+            const collected = Math.max(0, grandTotalBilled - Math.max(0, totalRemaining));
+            const progressPct = grandTotalBilled > 0 ? Math.min(100, Math.round((collected / grandTotalBilled) * 100)) : 0;
+            const settledCount = rows.filter(r => r.remaining === 0 && r.totalBilled > 0).length;
+            const visibleRows = hideSettled ? rows.filter(r => r.remaining !== 0 || r.totalBilled === 0) : rows;
 
             return (
                 <div className="animate-fade">
-                    <div style={{ background: "rgba(36,40,59,0.6)", borderRadius: 24, padding: "24px 20px", marginBottom: 24, border: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between" }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, color: "#8a94b5", fontWeight: 700, marginBottom: 8 }}>총 청구액</div>
-                            <div style={{ fontSize: 20, fontWeight: 900, color: "#c0caf5", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{won(grandTotalBilled)}</div>
+                    {/* 요약 카드 */}
+                    <div style={{ background: "rgba(36,40,59,0.6)", borderRadius: 24, padding: "20px 20px 16px", marginBottom: 16, border: "1px solid rgba(255,255,255,0.05)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, color: "#8a94b5", fontWeight: 700, marginBottom: 6 }}>총 청구액</div>
+                                <div style={{ fontSize: 20, fontWeight: 900, color: "#c0caf5", whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{won(grandTotalBilled)}</div>
+                            </div>
+                            <div style={{ width: 1, background: "rgba(255,255,255,0.1)", margin: "0 16px" }} />
+                            <div style={{ flex: 1, textAlign: "right", minWidth: 0 }}>
+                                <div style={{ fontSize: 13, color: totalRemainingColor, fontWeight: 700, marginBottom: 6 }}>남은 미수금</div>
+                                <div style={{ fontSize: 20, fontWeight: 900, color: totalRemainingColor, whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{totalRemaining<0?`+${won(Math.abs(totalRemaining))}`:won(totalRemaining)}</div>
+                            </div>
                         </div>
-                        <div style={{ width: 1, background: "rgba(255,255,255,0.1)", margin: "0 16px" }} />
-                        <div style={{ flex: 1, textAlign: "right", minWidth: 0 }}>
-                            <div style={{ fontSize: 13, color: totalRemainingColor, fontWeight: 700, marginBottom: 8 }}>남은 미수금</div>
-                            <div style={{ fontSize: 20, fontWeight: 900, color: totalRemainingColor, whiteSpace: "nowrap", letterSpacing: "-0.5px" }}>{totalRemaining<0?`+${won(Math.abs(totalRemaining))}`:won(totalRemaining)}</div>
+                        {/* 프로그레스 바 */}
+                        <div>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                                <span style={{ fontSize: 12, color: "#8a94b5", fontWeight: 700 }}>정산 진행률</span>
+                                <span style={{ fontSize: 12, fontWeight: 900, color: progressPct === 100 ? "#9ece6a" : "#7aa2f7" }}>{progressPct}%</span>
+                            </div>
+                            <div style={{ height: 8, background: "rgba(255,255,255,0.07)", borderRadius: 4, overflow: "hidden" }}>
+                                <div style={{ height: "100%", width: `${progressPct}%`, background: progressPct === 100 ? "linear-gradient(90deg,#9ece6a,#73daca)" : "linear-gradient(90deg,#7aa2f7,#bb9af7)", borderRadius: 4, transition: "width 0.6s ease" }} />
+                            </div>
                         </div>
                     </div>
-                    {rows.map(r => <PayRow key={r.client} {...r} monthKey={monthKey} onTogglePaid={onTogglePaid} onToggleMultiplePaid={onToggleMultiplePaid} onPartialPay={a => onPartialPay(r.client, monthKey, a)} onResetPay={() => onResetPay(r.client)} />)}
+
+                    {/* 필터 토글 */}
+                    {settledCount > 0 && (
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+                            <button onClick={() => setHideSettled(!hideSettled)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: hideSettled ? "rgba(158,206,106,0.15)" : "rgba(255,255,255,0.05)", border: `1px solid ${hideSettled ? "rgba(158,206,106,0.4)" : "rgba(255,255,255,0.1)"}`, borderRadius: 20, color: hideSettled ? "#9ece6a" : "#8a94b5", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
+                                {hideSettled ? `완료 ${settledCount}건 숨김` : `완료 ${settledCount}건 숨기기`}
+                            </button>
+                        </div>
+                    )}
+
+                    {visibleRows.map(r => <PayRow key={r.client} {...r} monthKey={monthKey} onTogglePaid={onTogglePaid} onToggleMultiplePaid={onToggleMultiplePaid} onPartialPay={a => onPartialPay(r.client, monthKey, a)} onResetPay={() => onResetPay(r.client)} />)}
+                    {visibleRows.length === 0 && <div style={{ textAlign: "center", color: "#565f89", padding: "40px 0", fontSize: 15, fontWeight: 700 }}>미수금 업체가 없습니다 🎉</div>}
                 </div>
             );
         }
@@ -1123,7 +1278,7 @@
                     {!hideHeader && <Header year={vY} month={vM} onPrev={prev} onNext={next} onToday={goToday} onOpenSettings={() => setShowSettings(true)} />}
                     
                     <div style={{ flex: 1, padding: "0 20px 140px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
-                        {tab==="summary" && <SummaryTab entries={monthEntries} unpaidMap={initialUnpaidMap} year={vY} month={vM} onDelete={setDel} onEditEntry={onEditEntry} allEntries={safeData.entries} setHideHeader={setHideHeader} />}
+                        {tab==="summary" && <SummaryTab entries={monthEntries} unpaidMap={initialUnpaidMap} year={vY} month={vM} onDelete={setDel} onEditEntry={onEditEntry} allEntries={safeData.entries} setHideHeader={setHideHeader} payments={safeData.payments} />}
                         {tab==="payment" && <PaymentTab allEntries={safeData.entries} monthKey={curMk} onTogglePaid={onTogglePaid} onToggleMultiplePaid={onToggleMultiplePaid} onPartialPay={onPartialPay} onResetPay={onResetPay} payments={safeData.payments} />}
                     </div>
                     
