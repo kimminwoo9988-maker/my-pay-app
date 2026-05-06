@@ -484,7 +484,7 @@
             const hasUnpaidDetail = unpaid > 0 && sortedUnpaidItems.length > 0;
 
             return (
-                <div style={{ ...S.overlay, zIndex: 20, background: "#0f111a", padding: 0, flexDirection: "column" }} onClick={onClose}>
+                <div style={{ ...S.overlay, zIndex: 50, background: "#0f111a", padding: 0, flexDirection: "column" }} onClick={onClose}>
                     <div
                         className="animate-pop"
                         onClick={e => e.stopPropagation()}
@@ -595,8 +595,6 @@
                                 <button onClick={onClose} style={{ flex: 1, padding: "14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 14, color: "#a9b1d6", fontWeight: 800, fontSize: 15, cursor: "pointer" }}>닫기</button>
                             </div>
                         </div>
-                        {/* 스크롤 여백 - 네비바 뒤에 가리지 않도록 */}
-                        <div style={{ minHeight: 200, flexShrink: 0 }} />
                     </div>
                 </div>
             );
@@ -844,7 +842,7 @@
                             if (isNaN(d.getTime())) return false;
                             return e.client === receiptClient && mk(d.getFullYear(), d.getMonth()) < curMk && !e.paid;
                         });
-                        return <ReceiptModal client={receiptClient} month={month} year={year} items={groups[receiptClient]?.items || []} unpaid={(unpaidMap||{})[receiptClient]||0} unpaidItems={clientUnpaidItems} payments={payments} curMk={curMk} onClose={() => setReceiptClient(null)} />;
+                        return ReactDOM.createPortal(<ReceiptModal client={receiptClient} month={month} year={year} items={groups[receiptClient]?.items || []} unpaid={(unpaidMap||{})[receiptClient]||0} unpaidItems={clientUnpaidItems} payments={payments} curMk={curMk} onClose={() => setReceiptClient(null)} />, document.body);
                     })()}
                 </div>
             );
