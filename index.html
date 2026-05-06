@@ -803,15 +803,15 @@
                                                             <button onClick={() => doEdit(e)} style={{ padding: "10px 14px", background: "#7aa2f7", border: "none", borderRadius: 10, color: "#0f111a", fontSize: 14, fontWeight: 900, flexShrink: 0 }}>확인</button>
                                                         </div>
                                                     ) : (
-                                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                                            <div>
-                                                                <div style={{ fontSize: 15, fontWeight: 600, color: e.discount?"#f7768e":"#c0caf5" }}>{tag(e)}</div>
+                                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                                                            <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                                                                <div style={{ fontSize: 15, fontWeight: 600, color: e.discount?"#f7768e":"#c0caf5", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tag(e)}</div>
                                                                 {e.deadline && <div style={{fontSize: 11, color: "#f7768e", marginTop: 4}}>마감: {e.deadline}</div>}
                                                             </div>
-                                                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                                                <span style={{ fontSize: 16, fontWeight: 800, color: e.discount?"#f7768e":"#fff" }}>{e.discount?"-":""}{won(e.amount)}</span>
-                                                                <button onClick={() => { setEditId(e.id); setEditAmt(e.amount.toLocaleString("ko-KR")); setEditDesc(e.desc||""); }} style={S.editBtn}>수정</button>
-                                                                <button onClick={() => onDelete(e)} style={S.delBtn}>✕</button>
+                                                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                                                                <span style={{ fontSize: 14, fontWeight: 800, color: e.discount?"#f7768e":"#fff", whiteSpace: "nowrap" }}>{e.discount?"-":""}{won(e.amount)}</span>
+                                                                <button onClick={() => { setEditId(e.id); setEditAmt(e.amount.toLocaleString("ko-KR")); setEditDesc(e.desc||""); }} style={{...S.editBtn, flexShrink: 0, padding: "6px 10px", fontSize: 12}}>수정</button>
+                                                                <button onClick={() => onDelete(e)} style={{...S.delBtn, flexShrink: 0, width: 30, height: 30}}>✕</button>
                                                             </div>
                                                         </div>
                                                     )}
