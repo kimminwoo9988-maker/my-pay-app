@@ -522,14 +522,9 @@
 
                             {totalReceived > 0 && (
                                 <div style={{ background: "#f0ece4", borderRadius: 10, padding: "14px 18px", marginBottom: 28 }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                                        <span style={{ fontSize: 11, fontWeight: 800, color: "#888", letterSpacing: "1px" }}>입금 완료</span>
-                                        <span style={{ fontSize: 14, fontWeight: 900, color: "#4a7c59" }}>-{totalReceived.toLocaleString("ko-KR")}원</span>
-                                    </div>
-                                    <div style={{ height: 1, background: "#ddd", marginBottom: 8 }} />
                                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ fontSize: 11, fontWeight: 800, color: "#888", letterSpacing: "1px" }}>청구 잔액</span>
-                                        <span style={{ fontSize: 16, fontWeight: 900, color: "#111" }}>{remainingAfterPay.toLocaleString("ko-KR")}원</span>
+                                        <span style={{ fontSize: 11, fontWeight: 800, color: "#888", letterSpacing: "1px" }}>입금 완료</span>
+                                        <span style={{ fontSize: 14, fontWeight: 900, color: "#4a7c59" }}>{totalReceived.toLocaleString("ko-KR")}원</span>
                                     </div>
                                 </div>
                             )}
@@ -565,11 +560,24 @@
                                 </tbody>
                             </table>
 
-                            <div style={{ borderTop: "2px solid #111", borderBottom: "2px solid #111", padding: "16px 0", marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <span style={{ fontSize: 14, fontWeight: 900, color: "#111", letterSpacing: "1px", flexShrink: 0 }}>TOTAL</span>
-                                <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 1, minWidth: 0, marginLeft: 12 }}>
-                                    <span style={{ fontSize: totalFontSize, fontWeight: 900, color: "#111" }}>{dueStr}</span>
-                                    {finalTotal < 0 && <div style={{ fontSize: 11, color: "#9ece6a", fontWeight: 800, marginTop: 2, whiteSpace: "normal" }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}
+                            {/* 합계 영역 */}
+                            <div style={{ borderTop: "2px solid #111", paddingTop: 16, marginTop: 8 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: "#888" }}>Sub total</span>
+                                    <span style={{ fontSize: 15, fontWeight: 800, color: "#333" }}>{Math.abs(finalTotal).toLocaleString("ko-KR")}</span>
+                                </div>
+                                {totalReceived > 0 && (
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: "#888" }}>입금 완료</span>
+                                        <span style={{ fontSize: 15, fontWeight: 800, color: "#4a7c59" }}>-{totalReceived.toLocaleString("ko-KR")}</span>
+                                    </div>
+                                )}
+                                <div style={{ borderTop: "2px solid #111", borderBottom: "2px solid #111", padding: "16px 0", marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <span style={{ fontSize: 14, fontWeight: 900, color: "#111", letterSpacing: "1px", flexShrink: 0 }}>TOTAL</span>
+                                    <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 1, minWidth: 0, marginLeft: 12 }}>
+                                        <span style={{ fontSize: totalFontSize, fontWeight: 900, color: "#111" }}>{dueStr}</span>
+                                        {finalTotal < 0 && <div style={{ fontSize: 11, color: "#9ece6a", fontWeight: 800, marginTop: 2, whiteSpace: "normal" }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}
+                                    </div>
                                 </div>
                             </div>
 
