@@ -401,9 +401,10 @@
             const totalReceived = totalPartialPaid + paidItemsAmt;
             const remainingAfterPay = Math.max(0, finalTotal - totalPartialPaid);
 
-            const finalTotalStr = isNaN(finalTotal) ? "0" : (finalTotal < 0 ? "0" : Math.abs(finalTotal).toLocaleString("ko-KR"));
-            const dueFontSize = finalTotalStr.length > 11 ? 20 : finalTotalStr.length > 8 ? 24 : 30;
-            const totalFontSize = finalTotalStr.length > 11 ? 16 : finalTotalStr.length > 8 ? 18 : 22;
+            const dueAmount = totalPartialPaid > 0 ? remainingAfterPay : finalTotal;
+            const dueStr = isNaN(dueAmount) ? "0" : (dueAmount < 0 ? "0" : Math.abs(dueAmount).toLocaleString("ko-KR"));
+            const dueFontSize = dueStr.length > 11 ? 20 : dueStr.length > 8 ? 24 : 30;
+            const totalFontSize = dueStr.length > 11 ? 16 : dueStr.length > 8 ? 18 : 22;
 
             const sortedUnpaidItems = [...(unpaidItems || [])].sort((a, b) => {
                 const da = new Date(a.date).getTime();
@@ -421,7 +422,7 @@
                     }); 
                 }
                 if (unpaid < 0) lines.push("", "선지급 차감: -"+won(Math.abs(unpaid)));
-                lines.push("", "총 청구액: "+(finalTotal<0?"0원 (선지급 잔액 +"+won(Math.abs(finalTotal))+")":won(finalTotal)));
+                lines.push("", "총 청구액: "+(dueAmount<=0?"0원 (선지급 잔액 +"+won(Math.abs(finalTotal))+")":won(dueAmount)));
                 if (totalReceived > 0) {
                     lines.push("입금 완료: -"+won(totalReceived));
                     lines.push("청구 잔액: "+won(remainingAfterPay));
@@ -514,7 +515,7 @@
                             <div style={{ background: "#111", borderRadius: 12, padding: "24px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 10px 20px rgba(0,0,0,0.08)" }}>
                                 <span style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: "2px", flexShrink: 0 }}>TOTAL DUE</span>
                                 <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 1, minWidth: 0, marginLeft: 12 }}>
-                                    <span style={{ fontSize: dueFontSize, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>{finalTotalStr}<span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>원</span></span>
+                                    <span style={{ fontSize: dueFontSize, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>{dueStr}<span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>원</span></span>
                                     {finalTotal < 0 && <div style={{ fontSize: 11, color: "#9ece6a", fontWeight: 800, marginTop: 4, whiteSpace: "normal" }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}
                                 </div>
                             </div>
@@ -567,7 +568,7 @@
                             <div style={{ borderTop: "2px solid #111", borderBottom: "2px solid #111", padding: "16px 0", marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <span style={{ fontSize: 14, fontWeight: 900, color: "#111", letterSpacing: "1px", flexShrink: 0 }}>TOTAL</span>
                                 <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 1, minWidth: 0, marginLeft: 12 }}>
-                                    <span style={{ fontSize: totalFontSize, fontWeight: 900, color: "#111" }}>{finalTotalStr}</span>
+                                    <span style={{ fontSize: totalFontSize, fontWeight: 900, color: "#111" }}>{dueStr}</span>
                                     {finalTotal < 0 && <div style={{ fontSize: 11, color: "#9ece6a", fontWeight: 800, marginTop: 2, whiteSpace: "normal" }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}
                                 </div>
                             </div>
