@@ -392,16 +392,16 @@
             const finalTotal = currentTotal + unpaid;
             const d = new Date();
             const todayStr = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")}`;
-            // 입금 내역 계산
+            // 입금 내역 계산 - 이번 달 입금만 집계
             const totalPartialPaid = Object.entries(payments || {}).filter(([pk]) => {
                 const parts = pk.split("::");
-                return parts.length === 2 && parts[1] === client && parts[0] <= (curMk || "");
+                return parts.length === 2 && parts[1] === client && parts[0] === (curMk || "");
             }).reduce((s, [, v]) => s + (Number(v) || 0), 0);
             const paidItemsAmt = items.filter(e => e.paid).reduce((s, e) => s + amt(e), 0);
             const totalReceived = totalPartialPaid + paidItemsAmt;
-            const remainingAfterPay = Math.max(0, finalTotal - totalPartialPaid);
+            const remainingAfterPay = Math.max(0, finalTotal - totalReceived);
 
-            const dueAmount = totalPartialPaid > 0 ? remainingAfterPay : finalTotal;
+            const dueAmount = totalReceived > 0 ? remainingAfterPay : finalTotal;
             const dueStr = isNaN(dueAmount) ? "0" : (dueAmount < 0 ? "0" : Math.abs(dueAmount).toLocaleString("ko-KR"));
             const dueFontSize = dueStr.length > 11 ? 20 : dueStr.length > 8 ? 24 : 30;
             const totalFontSize = dueStr.length > 11 ? 16 : dueStr.length > 8 ? 18 : 22;
@@ -414,19 +414,10 @@
 
             const copyText = async () => {
                 const lines = [`[${year}년 ${month+1}월] ${client}`, "", ...items.map(e => `- ${tag(e)} : ${e.discount?"-":""}${won(e.amount)}`)];
-                if (unpaid > 0) { 
-                    lines.push("", "미정산 이월: "+won(unpaid)); 
-                    sortedUnpaidItems.forEach(e => {
-                        const itemMonth = new Date(e.date).getMonth() + 1;
-                        lines.push(`  - ${tag(e)} (${itemMonth}월) : ${e.discount?"-":""}${won(e.amount)}`);
-                    }); 
-                }
+                if (unpaid > 0) lines.push("", "미정산 이월: +"+won(unpaid));
                 if (unpaid < 0) lines.push("", "선지급 차감: -"+won(Math.abs(unpaid)));
-                lines.push("", "총 청구액: "+(dueAmount<=0?"0원 (선지급 잔액 +"+won(Math.abs(finalTotal))+")":won(dueAmount)));
-                if (totalReceived > 0) {
-                    lines.push("입금 완료: -"+won(totalReceived));
-                    lines.push("청구 잔액: "+won(remainingAfterPay));
-                }
+                if (totalReceived > 0) lines.push("입금 완료: "+won(totalReceived));
+                lines.push("", "총 청구액: "+won(dueAmount));
                 
                 try { await navigator.clipboard.writeText(lines.join("\n")); alert("복사되었습니다!"); } 
                 catch { alert("복사 실패"); }
@@ -520,12 +511,26 @@
                                 </div>
                             </div>
 
-                            {totalReceived > 0 && (
-                                <div style={{ background: "#f0ece4", borderRadius: 10, padding: "14px 18px", marginBottom: 28 }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ fontSize: 11, fontWeight: 800, color: "#888", letterSpacing: "1px" }}>입금 완료</span>
-                                        <span style={{ fontSize: 14, fontWeight: 900, color: "#4a7c59" }}>{totalReceived.toLocaleString("ko-KR")}원</span>
-                                    </div>
+                            {(unpaid !== 0 || totalReceived > 0) && (
+                                <div style={{ background: "#f0ece4", borderRadius: 10, padding: "14px 18px", marginBottom: 28, display: "flex", flexDirection: "column", gap: 8 }}>
+                                    {unpaid > 0 && (
+                                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                            <span style={{ fontSize: 11, fontWeight: 800, color: "#888", letterSpacing: "1px" }}>미정산 이월</span>
+                                            <span style={{ fontSize: 14, fontWeight: 900, color: "#e0af68" }}>+{Math.abs(unpaid).toLocaleString("ko-KR")}원</span>
+                                        </div>
+                                    )}
+                                    {unpaid < 0 && (
+                                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                            <span style={{ fontSize: 11, fontWeight: 800, color: "#888", letterSpacing: "1px" }}>선지급 차감</span>
+                                            <span style={{ fontSize: 14, fontWeight: 900, color: "#9ece6a" }}>-{Math.abs(unpaid).toLocaleString("ko-KR")}원</span>
+                                        </div>
+                                    )}
+                                    {totalReceived > 0 && (
+                                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                            <span style={{ fontSize: 11, fontWeight: 800, color: "#888", letterSpacing: "1px" }}>입금 완료</span>
+                                            <span style={{ fontSize: 14, fontWeight: 900, color: "#4a7c59" }}>{totalReceived.toLocaleString("ko-KR")}원</span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -540,32 +545,27 @@
                                             <td style={{...tdR, color: e.discount?"#c0392b":"#222"}}>{e.discount?"-":""}{Math.abs(e.amount).toLocaleString("ko-KR")}</td>
                                         </tr>
                                     ))}
-                                    {unpaid > 0 && <tr><td style={{...tdS, color: "#e0af68", fontWeight: 700, borderBottom: hasUnpaidDetail?"none":"1px solid #ddd"}}>미정산 이월</td><td style={{...tdR, color: "#e0af68", borderBottom: hasUnpaidDetail?"none":"1px solid #ddd"}}>+{Math.abs(unpaid).toLocaleString("ko-KR")}</td></tr>}
-                                    
-                                    {hasUnpaidDetail && sortedUnpaidItems.map((e, i) => {
-                                        const itemMonth = new Date(e.date).getMonth() + 1;
-                                        return (
-                                            <tr key={`up-${e.id||i}`}>
-                                                <td style={{padding: "6px 0 6px 18px", fontSize: 12, fontWeight: 600, color: "#777", borderBottom: i===sortedUnpaidItems.length-1?"1px solid #ddd":"none"}}>
-                                                    - {tag(e)} ({itemMonth}월)
-                                                </td>
-                                                <td style={{padding: "6px 0", fontSize: 12, fontWeight: 800, color: "#777", textAlign: "right", borderBottom: i===sortedUnpaidItems.length-1?"1px solid #ddd":"none"}}>
-                                                    {e.discount?"-":""}{Math.abs(e.amount).toLocaleString("ko-KR")}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-
-                                    {unpaid < 0 && <tr><td style={{...tdS, color: "#9ece6a", fontWeight: 700}}>선지급 차감</td><td style={{...tdR, color: "#9ece6a"}}>-{Math.abs(unpaid).toLocaleString("ko-KR")}</td></tr>}
                                 </tbody>
                             </table>
 
                             {/* 합계 영역 */}
                             <div style={{ borderTop: "2px solid #111", paddingTop: 16, marginTop: 8 }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                                    <span style={{ fontSize: 13, fontWeight: 700, color: "#888" }}>Sub total</span>
-                                    <span style={{ fontSize: 15, fontWeight: 800, color: "#333" }}>{Math.abs(finalTotal).toLocaleString("ko-KR")}</span>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: "#888" }}>이번 달 작업</span>
+                                    <span style={{ fontSize: 15, fontWeight: 800, color: "#333" }}>{currentTotal.toLocaleString("ko-KR")}</span>
                                 </div>
+                                {unpaid > 0 && (
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: "#888" }}>미정산 이월</span>
+                                        <span style={{ fontSize: 15, fontWeight: 800, color: "#e0af68" }}>+{Math.abs(unpaid).toLocaleString("ko-KR")}</span>
+                                    </div>
+                                )}
+                                {unpaid < 0 && (
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: "#888" }}>선지급 차감</span>
+                                        <span style={{ fontSize: 15, fontWeight: 800, color: "#9ece6a" }}>-{Math.abs(unpaid).toLocaleString("ko-KR")}</span>
+                                    </div>
+                                )}
                                 {totalReceived > 0 && (
                                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
                                         <span style={{ fontSize: 13, fontWeight: 700, color: "#888" }}>입금 완료</span>
@@ -576,7 +576,6 @@
                                     <span style={{ fontSize: 14, fontWeight: 900, color: "#111", letterSpacing: "1px", flexShrink: 0 }}>TOTAL</span>
                                     <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 1, minWidth: 0, marginLeft: 12 }}>
                                         <span style={{ fontSize: totalFontSize, fontWeight: 900, color: "#111" }}>{dueStr}</span>
-                                        {finalTotal < 0 && <div style={{ fontSize: 11, color: "#9ece6a", fontWeight: 800, marginTop: 2, whiteSpace: "normal" }}>선지급 잔액: +{won(Math.abs(finalTotal))}</div>}
                                     </div>
                                 </div>
                             </div>
