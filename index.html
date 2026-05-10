@@ -386,7 +386,7 @@
         }
 
         // ─── 프리미엄 Invoice 정산서 ───
-        function ReceiptModal({ client, month, year, items, unpaid, unpaidItems, payments, curMk, onClose }) {
+        function ReceiptModal({ client, month, year, items, unpaid, payments, curMk, onClose }) {
             const [isProcessing, setIsProcessing] = useState(false);
             const currentTotal = items.reduce((s, e) => s + amt(e), 0);
             const finalTotal = currentTotal + unpaid;
@@ -405,12 +405,6 @@
             const dueStr = isNaN(dueAmount) ? "0" : (dueAmount < 0 ? "0" : Math.abs(dueAmount).toLocaleString("ko-KR"));
             const dueFontSize = dueStr.length > 11 ? 20 : dueStr.length > 8 ? 24 : 30;
             const totalFontSize = dueStr.length > 11 ? 16 : dueStr.length > 8 ? 18 : 22;
-
-            const sortedUnpaidItems = [...(unpaidItems || [])].sort((a, b) => {
-                const da = new Date(a.date).getTime();
-                const db = new Date(b.date).getTime();
-                return (isNaN(da) ? 0 : da) - (isNaN(db) ? 0 : db);
-            });
 
             const copyText = async () => {
                 const lines = [`[${year}년 ${month+1}월] ${client}`, "", ...items.map(e => `- ${tag(e)} : ${e.discount?"-":""}${won(e.amount)}`)];
@@ -473,7 +467,6 @@
             const thR = { ...thS, textAlign: "right" };
             const tdS = { padding: "14px 0", fontSize: 15, fontWeight: 600, color: "#222", borderBottom: "1px solid #ddd" };
             const tdR = { ...tdS, textAlign: "right", fontWeight: 800 };
-            const hasUnpaidDetail = unpaid > 0 && sortedUnpaidItems.length > 0;
 
             return (
                 <div style={{ ...S.overlay, zIndex: 50, background: "#0f111a", padding: 0, flexDirection: "column" }} onClick={onClose}>
@@ -845,12 +838,7 @@
 
                     {receiptClient && (() => {
                         const curMk = mk(year, month);
-                        const clientUnpaidItems = (allEntries || []).filter(e => {
-                            const d = new Date(e.date);
-                            if (isNaN(d.getTime())) return false;
-                            return e.client === receiptClient && mk(d.getFullYear(), d.getMonth()) < curMk && !e.paid;
-                        });
-                        return ReactDOM.createPortal(<ReceiptModal client={receiptClient} month={month} year={year} items={groups[receiptClient]?.items || []} unpaid={(unpaidMap||{})[receiptClient]||0} unpaidItems={clientUnpaidItems} payments={payments} curMk={curMk} onClose={() => setReceiptClient(null)} />, document.body);
+                        return ReactDOM.createPortal(<ReceiptModal client={receiptClient} month={month} year={year} items={groups[receiptClient]?.items || []} unpaid={(unpaidMap||{})[receiptClient]||0} payments={payments} curMk={curMk} onClose={() => setReceiptClient(null)} />, document.body);
                     })()}
                 </div>
             );
@@ -966,8 +954,8 @@
             const [open, setOpen] = useState(false); 
             const [val, setVal] = useState("");
 
-            const allPaid = allItems.length > 0 && allItems.every(e => e.paid);
-            const hasPaidSomething = totalPayments > 0 || allItems.some(e => e.paid);
+            const allPaid = (currentItems || []).length > 0 && (currentItems || []).every(e => e.paid);
+            const hasPaidSomething = totalPayments > 0 || (currentItems || []).some(e => e.paid);
 
             const go = () => { 
                 const r = parseInt(val.replace(/,/g,""),10); 
@@ -976,7 +964,7 @@
 
             const handleToggleAll = (e) => {
                 e.stopPropagation();
-                onToggleMultiplePaid(allItems.map(i => i.id), !allPaid);
+                onToggleMultiplePaid((currentItems || []).map(i => i.id), !allPaid);
             };
 
             const remainingColor = remaining === 0 ? "#7a84a6" : (remaining < 0 ? "#9ece6a" : "#f7768e");
@@ -1270,8 +1258,7 @@
 
             if (pinState !== "unlocked") return <LockScreen mode={pinState} savedPin={safeData.pin} onSuccess={handlePinSuccess} onCancel={pinState.startsWith("change_")?() => setPinState("unlocked"):null} />;
 
-            const curMk = mk(vY, vM); 
-            const nextMonthMk = vM===11?mk(vY+1,0):mk(vY,vM+1);
+            const curMk = mk(vY, vM);
             
             const monthEntries = safeData.entries.filter(e => { 
                 try {
@@ -1282,7 +1269,6 @@
             });
             
             const initialUnpaidMap = calcBalance(safeData.entries, safeData.payments, curMk);
-            const endOfMonthUnpaidMap = calcBalance(safeData.entries, safeData.payments, nextMonthMk);
 
             const onAdd = entry => persist({...safeData, entries: [...safeData.entries, {...entry, id: id(), paid: false}]});
             const onNewClient = name => { if (!safeData.clients.includes(name)) persist({...safeData, clients: [...safeData.clients, name]}); };
