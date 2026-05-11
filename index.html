@@ -856,11 +856,11 @@
                     const eMk = mk(d.getFullYear(), d.getMonth()); 
                     if (eMk > monthKey) return; 
 
-                    if (!byClient[e.client]) byClient[e.client] = { current: [], pastUnpaid: [] }; 
+                    if (!byClient[e.client]) byClient[e.client] = { current: [], past: [] }; 
                     if (eMk === monthKey) {
                         byClient[e.client].current.push(e);
-                    } else if (!e.paid) {
-                        byClient[e.client].pastUnpaid.push(e);
+                    } else {
+                        byClient[e.client].past.push(e);
                     }
                 } catch {}
             });
@@ -869,17 +869,17 @@
                 const parts = pk.split("::");
                 if (parts.length === 2 && parts[0] <= monthKey) {
                     const client = parts[1];
-                    if (!byClient[client]) byClient[client] = { current: [], pastUnpaid: [] };
+                    if (!byClient[client]) byClient[client] = { current: [], past: [] };
                 }
             });
 
             const rows = Object.keys(byClient).map(client => {
                 const currentItems = byClient[client].current;
-                const pastUnpaidItems = byClient[client].pastUnpaid;
+                const pastItems = byClient[client].past;
+                const pastUnpaidItems = pastItems.filter(e => !e.paid);
 
-                // 이전 달 입금 합계 (이번 달 이전)
+                // 이전 달 입금 합계
                 let pastPayments = 0;
-                // 이번 달 입금 합계
                 let currentPayments = 0;
                 Object.entries(payments || {}).forEach(([pk, val]) => {
                     const parts = pk.split("::");
@@ -889,19 +889,19 @@
                     }
                 });
 
-                // 전달 이월 = 미정산 항목 합계 - 이전 달 입금
-                const pastUnpaidRaw = pastUnpaidItems.reduce((s, e) => s + amt(e), 0);
-                const carryover = pastUnpaidRaw - pastPayments; // 양수=미정산, 음수=선지급
-                const allPastPaid = pastUnpaidItems.length > 0 && pastUnpaidItems.every(e => e.paid);
+                // 전달 이월 = 모든 과거 항목 합계 - 이전 달 입금 (paid 상태 무관, 항상 고정)
+                const pastTotal = pastItems.reduce((s, e) => s + amt(e), 0);
+                const carryover = pastTotal - pastPayments;
+                const allPastSettled = pastUnpaidItems.length === 0 && pastItems.length > 0;
 
                 const currentTotal = currentItems.reduce((s, e) => s + amt(e), 0);
                 const currentUnpaidTotal = currentItems.filter(e => !e.paid).reduce((s, e) => s + amt(e), 0);
                 const totalBilled = currentTotal + Math.max(0, carryover);
-                const remaining = (allPastPaid ? 0 : carryover) + currentUnpaidTotal - currentPayments;
+                const remaining = (allPastSettled ? 0 : Math.max(0, carryover)) + currentUnpaidTotal - currentPayments + Math.min(0, carryover);
                 
                 if (currentItems.length === 0 && carryover === 0 && currentPayments === 0) return null;
 
-                return { client, currentItems, pastUnpaidItems, carryover, allPastPaid, totalBilled, remaining, currentPayments };
+                return { client, currentItems, pastUnpaidItems, carryover, allPastSettled, totalBilled, remaining, currentPayments };
             }).filter(Boolean);
 
             const totalRemaining = rows.reduce((s,r) => s + Math.max(0, r.remaining), 0);
@@ -959,37 +959,34 @@
         }
 
         // ─── 입금 항목 (PayRow) ───
-        function PayRow({ client, currentItems, pastUnpaidItems, carryover, allPastPaid, totalBilled, remaining, currentPayments, onTogglePaid, onToggleMultiplePaid, onPartialPay, onResetPay }) {
+        function PayRow({ client, currentItems, pastUnpaidItems, carryover, allPastSettled, totalBilled, remaining, currentPayments, onTogglePaid, onToggleMultiplePaid, onPartialPay, onResetPay }) {
             const [open, setOpen] = useState(false); 
             const [val, setVal] = useState("");
 
             const currentAllPaid = (currentItems || []).length > 0 && (currentItems || []).every(e => e.paid);
-            const everythingDone = currentAllPaid && (carryover <= 0 || allPastPaid);
+            const hasCarryover = carryover > 0;
+            const hasPrepaid = carryover < 0;
+            const everythingDone = (hasCarryover ? allPastSettled : true) && ((currentItems || []).length === 0 || currentAllPaid);
 
             const go = () => { 
                 const r = parseInt(val.replace(/,/g,""),10); 
                 if(!isNaN(r) && r>0){ onPartialPay(r); setVal(""); }
             };
 
-            // 전체 선택: 이번 달 항목 + 전달 이월(과거 미정산 항목) 모두 토글
+            // 전체 선택: 이번 달 항목 + 전달 이월 항목 모두 토글
             const handleToggleAll = (e) => {
                 e.stopPropagation();
                 const allIds = [...(pastUnpaidItems || []).map(i => i.id), ...(currentItems || []).map(i => i.id)];
-                const allChecked = everythingDone;
-                onToggleMultiplePaid(allIds, !allChecked);
+                onToggleMultiplePaid(allIds, !everythingDone);
             };
 
             // 전달 이월 체크: 과거 미정산 항목 전체 토글
             const handleCarryoverToggle = () => {
-                onToggleMultiplePaid((pastUnpaidItems || []).map(i => i.id), !allPastPaid);
+                onToggleMultiplePaid((pastUnpaidItems || []).map(i => i.id), !allPastSettled);
             };
 
-            const isFullyDone = remaining <= 0;
+            const isFullyDone = remaining <= 0 && everythingDone;
             const remainingColor = isFullyDone ? "#7a84a6" : "#f7768e";
-
-            // 전달 이월 라벨
-            const carryoverLabel = carryover > 0 ? "전달 이월" : "전달 이월 (선지급)";
-            const carryoverColor = carryover > 0 ? "#e0af68" : "#9ece6a";
 
             return (
                 <div style={{ background: isFullyDone ? "rgba(26,27,38,0.5)" : "rgba(36,40,59,0.9)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: isFullyDone ? 0.6 : 1 }}>
@@ -998,28 +995,36 @@
                             <div style={{ fontSize: 18, fontWeight: 900, color: isFullyDone ? "#7a84a6" : "#fff", textDecoration: isFullyDone ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
                         </div>
                         <div style={{ flexShrink: 0, textAlign: "right", display: "flex", alignItems: "center", gap: 12 }}>
-                            <span style={{ fontSize: 22, fontWeight: 900, color: remainingColor, textDecoration: isFullyDone ? "line-through" : "none" }}>{remaining < 0 ? `+${won(Math.abs(remaining))}` : won(Math.max(0, remaining))}</span>
+                            <span style={{ fontSize: 22, fontWeight: 900, color: remainingColor, textDecoration: isFullyDone ? "line-through" : "none" }}>{won(Math.max(0, remaining))}</span>
                             <span style={{ fontSize: 14, color: "#565f89", transform: open ? "rotate(180deg)" : "rotate(0)", transition: "0.3s" }}>▼</span>
                         </div>
                     </div>
                     
                     {open && (
                         <div className="animate-slide" style={{ marginTop: 20, paddingTop: 8, borderTop: "1px dashed rgba(255,255,255,0.1)" }}>
+                            {/* 선지급 안내 (체크박스 없이 정보만) */}
+                            {hasPrepaid && (
+                                <div style={{ padding: "10px 14px", marginBottom: 10, background: "rgba(158,206,106,0.08)", borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: "#9ece6a" }}>전달 선지급</span>
+                                    <span style={{ fontSize: 14, fontWeight: 800, color: "#9ece6a" }}>+{won(Math.abs(carryover))}</span>
+                                </div>
+                            )}
+
                             {/* 전체 선택 */}
-                            {((currentItems || []).length > 0 || carryover !== 0) && (
+                            {((currentItems || []).length > 0 || hasCarryover) && (
                                 <label style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                                     <input type="checkbox" checked={everythingDone} onChange={handleToggleAll} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer" }} />
                                     <span style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>전체 선택</span>
                                 </label>
                             )}
 
-                            {/* 전달 이월 - 체크박스 포함 */}
-                            {carryover !== 0 && (
+                            {/* 전달 이월 - 체크박스 (양수일 때만) */}
+                            {hasCarryover && (
                                 <label style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                    <input type="checkbox" checked={allPastPaid} onChange={handleCarryoverToggle} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer", flexShrink: 0 }} />
+                                    <input type="checkbox" checked={allPastSettled} onChange={handleCarryoverToggle} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer", flexShrink: 0 }} />
                                     <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                        <div style={{ fontSize: 15, fontWeight: 700, color: allPastPaid ? "#565f89" : carryoverColor, textDecoration: allPastPaid ? "line-through" : "none" }}>{carryoverLabel}</div>
-                                        <div style={{ fontSize: 15, fontWeight: 800, color: allPastPaid ? "#565f89" : carryoverColor, textDecoration: allPastPaid ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{carryover > 0 ? "" : "+"}{won(Math.abs(carryover))}</div>
+                                        <div style={{ fontSize: 15, fontWeight: 700, color: allPastSettled ? "#565f89" : "#e0af68", textDecoration: allPastSettled ? "line-through" : "none" }}>전달 이월</div>
+                                        <div style={{ fontSize: 15, fontWeight: 800, color: allPastSettled ? "#565f89" : "#e0af68", textDecoration: allPastSettled ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{won(carryover)}</div>
                                     </div>
                                 </label>
                             )}
