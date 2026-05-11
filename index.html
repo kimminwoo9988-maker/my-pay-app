@@ -898,8 +898,8 @@
                 const totalBilled = currentTotal + Math.max(0, carryover);
                 const remaining = Math.max(0, carryover) + currentUnpaidTotal - currentPayments + Math.min(0, carryover);
                 
-                // 이번 달 작업이 없고 이월도 없으면 표시 안 함
-                if (currentItems.length === 0 && carryover <= 0 && currentPayments === 0) return null;
+                // 작업도 없고 이월도 없고 입금도 없으면 미표시 (선지급은 표시)
+                if (currentItems.length === 0 && carryover === 0 && currentPayments === 0) return null;
 
                 return { client, currentItems, pastUnpaidItems, carryover, allPastSettled, totalBilled, remaining, currentPayments };
             }).filter(Boolean);
@@ -967,42 +967,46 @@
             const hasCarryover = carryover > 0;
             const hasPrepaid = carryover < 0;
             const everythingDone = (hasCarryover ? allPastSettled : true) && ((currentItems || []).length === 0 || currentAllPaid);
+            
+            // 입금이 전체 합계를 초과하면 자동 완료 처리
+            const autoCompleted = remaining <= 0 && currentPayments > 0;
+            const isFullyDone = everythingDone || autoCompleted;
+            const isPrepaidState = remaining < 0; // 선지급 상태
 
             const go = () => { 
                 const r = parseInt(val.replace(/,/g,""),10); 
                 if(!isNaN(r) && r>0){ onPartialPay(r); setVal(""); }
             };
 
-            // 전체 선택: 이번 달 항목 + 전달 이월 항목 모두 토글
             const handleToggleAll = (e) => {
                 e.stopPropagation();
                 const allIds = [...(pastUnpaidItems || []).map(i => i.id), ...(currentItems || []).map(i => i.id)];
                 onToggleMultiplePaid(allIds, !everythingDone);
             };
 
-            // 전달 이월 체크: 과거 미정산 항목 전체 토글
             const handleCarryoverToggle = () => {
                 onToggleMultiplePaid((pastUnpaidItems || []).map(i => i.id), !allPastSettled);
             };
 
-            const isFullyDone = remaining <= 0 && everythingDone;
-            const remainingColor = isFullyDone ? "#7a84a6" : "#f7768e";
+            // 색상: 선지급(초록), 미수금(빨강), 완료(회색)
+            const remainingColor = isFullyDone && !isPrepaidState ? "#7a84a6" : isPrepaidState ? "#9ece6a" : "#f7768e";
+            const displayAmount = isPrepaidState ? `+${won(Math.abs(remaining))}` : won(Math.max(0, remaining));
 
             return (
-                <div style={{ background: isFullyDone ? "rgba(26,27,38,0.5)" : "rgba(36,40,59,0.9)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: isFullyDone ? 0.6 : 1 }}>
+                <div style={{ background: isFullyDone && !isPrepaidState ? "rgba(26,27,38,0.5)" : "rgba(36,40,59,0.9)", border: `1px solid ${isPrepaidState ? "rgba(158,206,106,0.15)" : "rgba(255,255,255,0.05)"}`, borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: isFullyDone && !isPrepaidState ? 0.6 : 1 }}>
                     <div onClick={() => setOpen(!open)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                         <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
-                            <div style={{ fontSize: 18, fontWeight: 900, color: isFullyDone ? "#7a84a6" : "#fff", textDecoration: isFullyDone ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
+                            <div style={{ fontSize: 18, fontWeight: 900, color: isFullyDone && !isPrepaidState ? "#7a84a6" : "#fff", textDecoration: isFullyDone && !isPrepaidState ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
                         </div>
                         <div style={{ flexShrink: 0, textAlign: "right", display: "flex", alignItems: "center", gap: 12 }}>
-                            <span style={{ fontSize: 22, fontWeight: 900, color: remainingColor, textDecoration: isFullyDone ? "line-through" : "none" }}>{won(Math.max(0, remaining))}</span>
+                            <span style={{ fontSize: 22, fontWeight: 900, color: remainingColor, textDecoration: isFullyDone && !isPrepaidState ? "line-through" : "none" }}>{displayAmount}</span>
                             <span style={{ fontSize: 14, color: "#565f89", transform: open ? "rotate(180deg)" : "rotate(0)", transition: "0.3s" }}>▼</span>
                         </div>
                     </div>
                     
                     {open && (
                         <div className="animate-slide" style={{ marginTop: 20, paddingTop: 8, borderTop: "1px dashed rgba(255,255,255,0.1)" }}>
-                            {/* 선지급 안내 (체크박스 없이 정보만) */}
+                            {/* 선지급 안내 */}
                             {hasPrepaid && (
                                 <div style={{ padding: "10px 14px", marginBottom: 10, background: "rgba(158,206,106,0.08)", borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                     <span style={{ fontSize: 13, fontWeight: 700, color: "#9ece6a" }}>전달 선지급</span>
@@ -1013,32 +1017,35 @@
                             {/* 전체 선택 */}
                             {((currentItems || []).length > 0 || hasCarryover) && (
                                 <label style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                    <input type="checkbox" checked={everythingDone} onChange={handleToggleAll} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer" }} />
+                                    <input type="checkbox" checked={isFullyDone} onChange={handleToggleAll} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer" }} />
                                     <span style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>전체 선택</span>
                                 </label>
                             )}
 
-                            {/* 전달 이월 - 체크박스 (양수일 때만) */}
+                            {/* 전달 이월 (양수일 때만) */}
                             {hasCarryover && (
                                 <label style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                    <input type="checkbox" checked={allPastSettled} onChange={handleCarryoverToggle} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer", flexShrink: 0 }} />
+                                    <input type="checkbox" checked={allPastSettled || autoCompleted} onChange={handleCarryoverToggle} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer", flexShrink: 0 }} />
                                     <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                        <div style={{ fontSize: 15, fontWeight: 700, color: allPastSettled ? "#565f89" : "#e0af68", textDecoration: allPastSettled ? "line-through" : "none" }}>전달 이월</div>
-                                        <div style={{ fontSize: 15, fontWeight: 800, color: allPastSettled ? "#565f89" : "#e0af68", textDecoration: allPastSettled ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{won(carryover)}</div>
+                                        <div style={{ fontSize: 15, fontWeight: 700, color: (allPastSettled || autoCompleted) ? "#565f89" : "#e0af68", textDecoration: (allPastSettled || autoCompleted) ? "line-through" : "none" }}>전달 이월</div>
+                                        <div style={{ fontSize: 15, fontWeight: 800, color: (allPastSettled || autoCompleted) ? "#565f89" : "#e0af68", textDecoration: (allPastSettled || autoCompleted) ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{won(carryover)}</div>
                                     </div>
                                 </label>
                             )}
                             
                             {/* 이번 달 작업 내역 */}
-                            {(currentItems || []).map(item => (
-                                <label key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                    <input type="checkbox" checked={item.paid} onChange={() => onTogglePaid(item.id, !item.paid)} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer", flexShrink: 0 }} />
-                                    <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                        <div style={{ fontSize: 15, fontWeight: 600, color: item.paid ? "#565f89" : "#c0caf5", textDecoration: item.paid ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tag(item)}</div>
-                                        <div style={{ fontSize: 15, fontWeight: 800, color: item.paid ? "#565f89" : (item.discount ? "#f7768e" : "#fff"), textDecoration: item.paid ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{item.discount ? "-" : ""}{won(item.amount)}</div>
-                                    </div>
-                                </label>
-                            ))}
+                            {(currentItems || []).map(item => {
+                                const itemDone = item.paid || autoCompleted;
+                                return (
+                                    <label key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                        <input type="checkbox" checked={itemDone} onChange={() => onTogglePaid(item.id, !item.paid)} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer", flexShrink: 0 }} />
+                                        <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                            <div style={{ fontSize: 15, fontWeight: 600, color: itemDone ? "#565f89" : "#c0caf5", textDecoration: itemDone ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tag(item)}</div>
+                                            <div style={{ fontSize: 15, fontWeight: 800, color: itemDone ? "#565f89" : (item.discount ? "#f7768e" : "#fff"), textDecoration: itemDone ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{item.discount ? "-" : ""}{won(item.amount)}</div>
+                                        </div>
+                                    </label>
+                                );
+                            })}
 
                             {/* 이번 달 입금 내역 */}
                             {currentPayments > 0 && (
@@ -1051,6 +1058,12 @@
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                             <span style={{ fontSize: 13, color: "#f7768e", fontWeight: 700 }}>남은 잔액</span>
                                             <span style={{ fontSize: 15, fontWeight: 900, color: "#f7768e" }}>{won(remaining)}</span>
+                                        </div>
+                                    )}
+                                    {isPrepaidState && (
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                            <span style={{ fontSize: 13, color: "#9ece6a", fontWeight: 700 }}>선지급 잔액</span>
+                                            <span style={{ fontSize: 15, fontWeight: 900, color: "#9ece6a" }}>+{won(Math.abs(remaining))}</span>
                                         </div>
                                     )}
                                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
