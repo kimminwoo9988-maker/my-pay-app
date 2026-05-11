@@ -896,7 +896,10 @@
                 const currentTotal = currentItems.reduce((s, e) => s + amt(e), 0);
                 const currentUnpaidTotal = currentItems.filter(e => !e.paid).reduce((s, e) => s + amt(e), 0);
                 const totalBilled = currentTotal + Math.max(0, carryover);
-                const remaining = Math.max(0, carryover) + currentUnpaidTotal - currentPayments + Math.min(0, carryover);
+                // 모든 항목 수동 체크 시 입금 기록 이중 차감 방지
+                const currentAllChecked = currentItems.length > 0 && currentItems.every(e => e.paid);
+                const effectivePayments = currentAllChecked ? 0 : currentPayments;
+                const remaining = Math.max(0, carryover) + currentUnpaidTotal - effectivePayments + Math.min(0, carryover);
                 
                 if (currentItems.length === 0 && carryover === 0 && currentPayments === 0) return null;
 
