@@ -888,9 +888,13 @@
                     }
                 });
 
-                // 전달 이월: 모든 과거 항목이 paid면 0, 아니면 미정산 - 입금
+                // 전달 이월 계산
                 const allPastSettled = pastItems.length > 0 && pastUnpaidItems.length === 0;
+                const pastTotal = pastItems.reduce((s, e) => s + amt(e), 0);
                 const pastUnpaidRaw = pastUnpaidItems.reduce((s, e) => s + amt(e), 0);
+                // 표시용: 항상 고정 (과거 전체 - 과거 입금)
+                const carryoverDisplay = pastItems.length > 0 ? (pastTotal - pastPayments) : 0;
+                // 계산용: 체크 완료면 0
                 const carryover = allPastSettled ? 0 : (pastUnpaidRaw - pastPayments);
 
                 const currentTotal = currentItems.reduce((s, e) => s + amt(e), 0);
@@ -898,15 +902,13 @@
                 const currentAllPaid = currentItems.length > 0 && currentItems.every(e => e.paid);
                 const totalBilled = currentTotal + Math.max(0, carryover);
                 
-                // 모든 항목이 수동 체크 완료면 remaining = 0 (입금 기록과 무관)
                 const allManuallySettled = (pastItems.length === 0 || allPastSettled) && (currentItems.length === 0 || currentAllPaid);
                 const rawRemaining = Math.max(0, carryover) + currentUnpaidTotal - currentPayments + Math.min(0, carryover);
                 const remaining = allManuallySettled ? 0 : rawRemaining;
                 
-                // 작업도 없고 이월도 없고 입금도 없으면 미표시 (선지급은 표시)
-                if (currentItems.length === 0 && carryover === 0 && currentPayments === 0) return null;
+                if (currentItems.length === 0 && carryoverDisplay === 0 && currentPayments === 0) return null;
 
-                return { client, currentItems, pastUnpaidItems, carryover, allPastSettled, totalBilled, remaining, currentPayments };
+                return { client, currentItems, pastUnpaidItems, carryover, carryoverDisplay, allPastSettled, allManuallySettled, totalBilled, remaining, currentPayments };
             }).filter(Boolean);
 
             const totalRemaining = rows.reduce((s,r) => s + Math.max(0, r.remaining), 0);
@@ -964,19 +966,18 @@
         }
 
         // ─── 입금 항목 (PayRow) ───
-        function PayRow({ client, currentItems, pastUnpaidItems, carryover, allPastSettled, totalBilled, remaining, currentPayments, onTogglePaid, onToggleMultiplePaid, onPartialPay, onResetPay }) {
+        function PayRow({ client, currentItems, pastUnpaidItems, carryover, carryoverDisplay, allPastSettled, allManuallySettled, totalBilled, remaining, currentPayments, onTogglePaid, onToggleMultiplePaid, onPartialPay, onResetPay }) {
             const [open, setOpen] = useState(false); 
             const [val, setVal] = useState("");
 
             const currentAllPaid = (currentItems || []).length > 0 && (currentItems || []).every(e => e.paid);
-            const hasCarryover = carryover > 0;
-            const hasPrepaid = carryover < 0;
+            const hasCarryover = carryoverDisplay > 0;
+            const hasPrepaid = carryoverDisplay < 0;
             const everythingDone = (hasCarryover ? allPastSettled : true) && ((currentItems || []).length === 0 || currentAllPaid);
             
-            // 입금이 전체 합계를 초과하면 자동 완료 처리
-            const autoCompleted = remaining <= 0 && currentPayments > 0;
-            const isFullyDone = everythingDone || autoCompleted;
-            const isPrepaidState = remaining < 0; // 선지급 상태
+            const autoCompleted = remaining <= 0 && currentPayments > 0 && !allManuallySettled;
+            const isFullyDone = everythingDone || autoCompleted || allManuallySettled;
+            const isPrepaidState = remaining < 0;
 
             const go = () => { 
                 const r = parseInt(val.replace(/,/g,""),10); 
@@ -1015,7 +1016,7 @@
                             {hasPrepaid && (
                                 <div style={{ padding: "10px 14px", marginBottom: 10, background: "rgba(158,206,106,0.08)", borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                     <span style={{ fontSize: 13, fontWeight: 700, color: "#9ece6a" }}>전달 선지급</span>
-                                    <span style={{ fontSize: 14, fontWeight: 800, color: "#9ece6a" }}>+{won(Math.abs(carryover))}</span>
+                                    <span style={{ fontSize: 14, fontWeight: 800, color: "#9ece6a" }}>+{won(Math.abs(carryoverDisplay))}</span>
                                 </div>
                             )}
 
@@ -1033,7 +1034,7 @@
                                     <input type="checkbox" checked={allPastSettled || autoCompleted} onChange={handleCarryoverToggle} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer", flexShrink: 0 }} />
                                     <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                         <div style={{ fontSize: 15, fontWeight: 700, color: (allPastSettled || autoCompleted) ? "#565f89" : "#e0af68", textDecoration: (allPastSettled || autoCompleted) ? "line-through" : "none" }}>전달 이월</div>
-                                        <div style={{ fontSize: 15, fontWeight: 800, color: (allPastSettled || autoCompleted) ? "#565f89" : "#e0af68", textDecoration: (allPastSettled || autoCompleted) ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{won(carryover)}</div>
+                                        <div style={{ fontSize: 15, fontWeight: 800, color: (allPastSettled || autoCompleted) ? "#565f89" : "#e0af68", textDecoration: (allPastSettled || autoCompleted) ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{won(carryoverDisplay)}</div>
                                     </div>
                                 </label>
                             )}
@@ -1052,8 +1053,8 @@
                                 );
                             })}
 
-                            {/* 이번 달 입금 내역 */}
-                            {currentPayments > 0 && (
+                            {/* 이번 달 입금 내역 - 수동 완료 시 숨김 */}
+                            {currentPayments > 0 && !allManuallySettled && (
                                 <div style={{ marginTop: 16, background: "rgba(0,0,0,0.2)", borderRadius: 12, padding: "14px 16px" }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                                         <span style={{ fontSize: 13, color: "#9ece6a", fontWeight: 700 }}>이번 달 입금</span>
