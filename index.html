@@ -859,7 +859,7 @@
                     if (!byClient[e.client]) byClient[e.client] = { current: [], past: [] }; 
                     if (eMk === monthKey) {
                         byClient[e.client].current.push(e);
-                    } else {
+                    } else if (eMk < monthKey) {
                         byClient[e.client].past.push(e);
                     }
                 } catch {}
@@ -878,7 +878,6 @@
                 const pastItems = byClient[client].past;
                 const pastUnpaidItems = pastItems.filter(e => !e.paid);
 
-                // 이전 달 입금 합계
                 let pastPayments = 0;
                 let currentPayments = 0;
                 Object.entries(payments || {}).forEach(([pk, val]) => {
@@ -889,17 +888,18 @@
                     }
                 });
 
-                // 전달 이월 = 모든 과거 항목 합계 - 이전 달 입금 (paid 상태 무관, 항상 고정)
-                const pastTotal = pastItems.reduce((s, e) => s + amt(e), 0);
-                const carryover = pastTotal - pastPayments;
-                const allPastSettled = pastUnpaidItems.length === 0 && pastItems.length > 0;
+                // 전달 이월: 모든 과거 항목이 paid면 0, 아니면 미정산 - 입금
+                const allPastSettled = pastItems.length > 0 && pastUnpaidItems.length === 0;
+                const pastUnpaidRaw = pastUnpaidItems.reduce((s, e) => s + amt(e), 0);
+                const carryover = allPastSettled ? 0 : (pastUnpaidRaw - pastPayments);
 
                 const currentTotal = currentItems.reduce((s, e) => s + amt(e), 0);
                 const currentUnpaidTotal = currentItems.filter(e => !e.paid).reduce((s, e) => s + amt(e), 0);
                 const totalBilled = currentTotal + Math.max(0, carryover);
-                const remaining = (allPastSettled ? 0 : Math.max(0, carryover)) + currentUnpaidTotal - currentPayments + Math.min(0, carryover);
+                const remaining = Math.max(0, carryover) + currentUnpaidTotal - currentPayments + Math.min(0, carryover);
                 
-                if (currentItems.length === 0 && carryover === 0 && currentPayments === 0) return null;
+                // 이번 달 작업이 없고 이월도 없으면 표시 안 함
+                if (currentItems.length === 0 && carryover <= 0 && currentPayments === 0) return null;
 
                 return { client, currentItems, pastUnpaidItems, carryover, allPastSettled, totalBilled, remaining, currentPayments };
             }).filter(Boolean);
