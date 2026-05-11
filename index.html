@@ -878,13 +878,26 @@
                 const pastItems = byClient[client].past;
                 const pastUnpaidItems = pastItems.filter(e => !e.paid);
 
+                // 각 월의 미정산 항목 존재 여부 확인
+                const monthsWithUnpaid = new Set();
+                pastUnpaidItems.forEach(e => {
+                    const d = new Date(e.date);
+                    if (!isNaN(d.getTime())) monthsWithUnpaid.add(mk(d.getFullYear(), d.getMonth()));
+                });
+
                 let pastPayments = 0;
                 let currentPayments = 0;
                 Object.entries(payments || {}).forEach(([pk, val]) => {
                     const parts = pk.split("::");
                     if (parts.length === 2 && parts[1] === client) {
-                        if (parts[0] < monthKey) pastPayments += (Number(val) || 0);
-                        else if (parts[0] === monthKey) currentPayments += (Number(val) || 0);
+                        if (parts[0] < monthKey) {
+                            // 해당 월에 미정산 항목이 있을 때만 입금 차감
+                            if (monthsWithUnpaid.has(parts[0])) {
+                                pastPayments += (Number(val) || 0);
+                            }
+                        } else if (parts[0] === monthKey) {
+                            currentPayments += (Number(val) || 0);
+                        }
                     }
                 });
 
