@@ -876,26 +876,35 @@
             const rows = Object.keys(byClient).map(client => {
                 const currentItems = byClient[client].current;
                 const pastUnpaidItems = byClient[client].pastUnpaid;
-                const allItems = [...pastUnpaidItems, ...currentItems].sort((a,b) => new Date(a.date) - new Date(b.date));
 
-                let totalPayments = 0;
+                // 이전 달 입금 합계 (이번 달 이전)
+                let pastPayments = 0;
+                // 이번 달 입금 합계
+                let currentPayments = 0;
                 Object.entries(payments || {}).forEach(([pk, val]) => {
                     const parts = pk.split("::");
-                    if (parts.length === 2 && parts[1] === client && parts[0] <= monthKey) {
-                        totalPayments += (Number(val) || 0);
+                    if (parts.length === 2 && parts[1] === client) {
+                        if (parts[0] < monthKey) pastPayments += (Number(val) || 0);
+                        else if (parts[0] === monthKey) currentPayments += (Number(val) || 0);
                     }
                 });
 
-                const totalBilled = allItems.reduce((s, e) => s + amt(e), 0);
-                const pastUnpaidTotal = pastUnpaidItems.reduce((s, e) => s + amt(e), 0);
-                const remaining = allItems.filter(e => !e.paid).reduce((s, e) => s + amt(e), 0) - totalPayments;
-                
-                if (allItems.length === 0 && totalPayments === 0) return null;
+                // 전달 이월 = 미정산 항목 합계 - 이전 달 입금
+                const pastUnpaidRaw = pastUnpaidItems.reduce((s, e) => s + amt(e), 0);
+                const carryover = pastUnpaidRaw - pastPayments; // 양수=미정산, 음수=선지급
+                const allPastPaid = pastUnpaidItems.length > 0 && pastUnpaidItems.every(e => e.paid);
 
-                return { client, allItems, currentItems, pastUnpaidTotal, totalBilled, remaining, totalPayments };
+                const currentTotal = currentItems.reduce((s, e) => s + amt(e), 0);
+                const currentUnpaidTotal = currentItems.filter(e => !e.paid).reduce((s, e) => s + amt(e), 0);
+                const totalBilled = currentTotal + Math.max(0, carryover);
+                const remaining = (allPastPaid ? 0 : carryover) + currentUnpaidTotal - currentPayments;
+                
+                if (currentItems.length === 0 && carryover === 0 && currentPayments === 0) return null;
+
+                return { client, currentItems, pastUnpaidItems, carryover, allPastPaid, totalBilled, remaining, currentPayments };
             }).filter(Boolean);
 
-            const totalRemaining = rows.reduce((s,r) => s+r.remaining, 0);
+            const totalRemaining = rows.reduce((s,r) => s + Math.max(0, r.remaining), 0);
             const grandTotalBilled = rows.reduce((s,r) => s+r.totalBilled, 0);
 
             if (rows.length===0) return <div className="animate-fade" style={S.card}><div style={S.empty}>이번 달 입금/청구 내역이 없습니다.</div></div>;
@@ -903,8 +912,8 @@
             const totalRemainingColor = totalRemaining < 0 ? "#9ece6a" : "#f7768e";
             const collected = Math.max(0, grandTotalBilled - Math.max(0, totalRemaining));
             const progressPct = grandTotalBilled > 0 ? Math.min(100, Math.round((collected / grandTotalBilled) * 100)) : 0;
-            const settledCount = rows.filter(r => r.remaining === 0 && r.totalBilled > 0).length;
-            const visibleRows = hideSettled ? rows.filter(r => r.remaining !== 0 || r.totalBilled === 0) : rows;
+            const settledCount = rows.filter(r => r.remaining <= 0 && r.totalBilled > 0).length;
+            const visibleRows = hideSettled ? rows.filter(r => r.remaining > 0 || r.totalBilled === 0) : rows;
 
             return (
                 <div className="animate-fade">
@@ -943,32 +952,44 @@
                         </div>
                     )}
 
-                    {visibleRows.map(r => <PayRow key={r.client} {...r} monthKey={monthKey} onTogglePaid={onTogglePaid} onToggleMultiplePaid={onToggleMultiplePaid} onPartialPay={a => onPartialPay(r.client, monthKey, a)} onResetPay={() => onResetPay(r.client)} />)}
+                    {visibleRows.map(r => <PayRow key={r.client} {...r} onTogglePaid={onTogglePaid} onToggleMultiplePaid={onToggleMultiplePaid} onPartialPay={a => onPartialPay(r.client, monthKey, a)} onResetPay={() => onResetPay(r.client)} />)}
                     {visibleRows.length === 0 && <div style={{ textAlign: "center", color: "#565f89", padding: "40px 0", fontSize: 15, fontWeight: 700 }}>미수금 업체가 없습니다 🎉</div>}
                 </div>
             );
         }
 
         // ─── 입금 항목 (PayRow) ───
-        function PayRow({ client, allItems, currentItems, pastUnpaidTotal, totalBilled, remaining, totalPayments, onTogglePaid, onToggleMultiplePaid, onPartialPay, onResetPay }) {
+        function PayRow({ client, currentItems, pastUnpaidItems, carryover, allPastPaid, totalBilled, remaining, currentPayments, onTogglePaid, onToggleMultiplePaid, onPartialPay, onResetPay }) {
             const [open, setOpen] = useState(false); 
             const [val, setVal] = useState("");
 
-            const allPaid = (currentItems || []).length > 0 && (currentItems || []).every(e => e.paid);
-            const hasPaidSomething = totalPayments > 0 || (currentItems || []).some(e => e.paid);
+            const currentAllPaid = (currentItems || []).length > 0 && (currentItems || []).every(e => e.paid);
+            const everythingDone = currentAllPaid && (carryover <= 0 || allPastPaid);
 
             const go = () => { 
                 const r = parseInt(val.replace(/,/g,""),10); 
                 if(!isNaN(r) && r>0){ onPartialPay(r); setVal(""); }
             };
 
+            // 전체 선택: 이번 달 항목 + 전달 이월(과거 미정산 항목) 모두 토글
             const handleToggleAll = (e) => {
                 e.stopPropagation();
-                onToggleMultiplePaid((currentItems || []).map(i => i.id), !allPaid);
+                const allIds = [...(pastUnpaidItems || []).map(i => i.id), ...(currentItems || []).map(i => i.id)];
+                const allChecked = everythingDone;
+                onToggleMultiplePaid(allIds, !allChecked);
             };
 
-            const remainingColor = remaining === 0 ? "#7a84a6" : (remaining < 0 ? "#9ece6a" : "#f7768e");
+            // 전달 이월 체크: 과거 미정산 항목 전체 토글
+            const handleCarryoverToggle = () => {
+                onToggleMultiplePaid((pastUnpaidItems || []).map(i => i.id), !allPastPaid);
+            };
+
             const isFullyDone = remaining <= 0;
+            const remainingColor = isFullyDone ? "#7a84a6" : "#f7768e";
+
+            // 전달 이월 라벨
+            const carryoverLabel = carryover > 0 ? "전달 이월" : "전달 이월 (선지급)";
+            const carryoverColor = carryover > 0 ? "#e0af68" : "#9ece6a";
 
             return (
                 <div style={{ background: isFullyDone ? "rgba(26,27,38,0.5)" : "rgba(36,40,59,0.9)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 20, padding: "20px 16px", marginBottom: 16, transition: "all 0.3s ease", opacity: isFullyDone ? 0.6 : 1 }}>
@@ -977,50 +998,49 @@
                             <div style={{ fontSize: 18, fontWeight: 900, color: isFullyDone ? "#7a84a6" : "#fff", textDecoration: isFullyDone ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{client}</div>
                         </div>
                         <div style={{ flexShrink: 0, textAlign: "right", display: "flex", alignItems: "center", gap: 12 }}>
-                            <span style={{ fontSize: 22, fontWeight: 900, color: remainingColor, textDecoration: isFullyDone ? "line-through" : "none" }}>{remaining < 0 ? `+${won(Math.abs(remaining))}` : won(remaining)}</span>
+                            <span style={{ fontSize: 22, fontWeight: 900, color: remainingColor, textDecoration: isFullyDone ? "line-through" : "none" }}>{remaining < 0 ? `+${won(Math.abs(remaining))}` : won(Math.max(0, remaining))}</span>
                             <span style={{ fontSize: 14, color: "#565f89", transform: open ? "rotate(180deg)" : "rotate(0)", transition: "0.3s" }}>▼</span>
                         </div>
                     </div>
                     
                     {open && (
                         <div className="animate-slide" style={{ marginTop: 20, paddingTop: 8, borderTop: "1px dashed rgba(255,255,255,0.1)" }}>
-                            {/* 전달 미정산 요약 */}
-                            {pastUnpaidTotal > 0 && (
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                    <span style={{ fontSize: 15, fontWeight: 700, color: hasPaidSomething ? "#565f89" : "#e0af68", textDecoration: hasPaidSomething ? "line-through" : "none" }}>전달 미정산</span>
-                                    <span style={{ fontSize: 15, fontWeight: 800, color: hasPaidSomething ? "#565f89" : "#e0af68", textDecoration: hasPaidSomething ? "line-through" : "none" }}>+{won(pastUnpaidTotal)}</span>
-                                </div>
+                            {/* 전체 선택 */}
+                            {((currentItems || []).length > 0 || carryover !== 0) && (
+                                <label style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                    <input type="checkbox" checked={everythingDone} onChange={handleToggleAll} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer" }} />
+                                    <span style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>전체 선택</span>
+                                </label>
                             )}
 
+                            {/* 전달 이월 - 체크박스 포함 */}
+                            {carryover !== 0 && (
+                                <label style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                    <input type="checkbox" checked={allPastPaid} onChange={handleCarryoverToggle} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer", flexShrink: 0 }} />
+                                    <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <div style={{ fontSize: 15, fontWeight: 700, color: allPastPaid ? "#565f89" : carryoverColor, textDecoration: allPastPaid ? "line-through" : "none" }}>{carryoverLabel}</div>
+                                        <div style={{ fontSize: 15, fontWeight: 800, color: allPastPaid ? "#565f89" : carryoverColor, textDecoration: allPastPaid ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{carryover > 0 ? "" : "+"}{won(Math.abs(carryover))}</div>
+                                    </div>
+                                </label>
+                            )}
+                            
                             {/* 이번 달 작업 내역 */}
-                            {(currentItems || []).length > 0 && (
-                                <>
-                                    <label style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                        <input type="checkbox" checked={allPaid} onChange={handleToggleAll} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer" }} />
-                                        <span style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>전체 선택</span>
-                                    </label>
-                                    
-                                    {(currentItems || []).map(item => {
-                                        const isPaidStyle = item.paid || totalPayments > 0;
-                                        return (
-                                            <label key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                                <input type="checkbox" checked={item.paid} onChange={() => onTogglePaid(item.id, !item.paid)} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer", flexShrink: 0 }} />
-                                                <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                                    <div style={{ fontSize: 15, fontWeight: 600, color: isPaidStyle ? "#565f89" : "#c0caf5", textDecoration: isPaidStyle ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tag(item)}</div>
-                                                    <div style={{ fontSize: 15, fontWeight: 800, color: isPaidStyle ? "#565f89" : (item.discount ? "#f7768e" : "#fff"), textDecoration: isPaidStyle ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{item.discount ? "-" : ""}{won(item.amount)}</div>
-                                                </div>
-                                            </label>
-                                        );
-                                    })}
-                                </>
-                            )}
+                            {(currentItems || []).map(item => (
+                                <label key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                    <input type="checkbox" checked={item.paid} onChange={() => onTogglePaid(item.id, !item.paid)} style={{ width: 22, height: 22, accentColor: "#9ece6a", cursor: "pointer", flexShrink: 0 }} />
+                                    <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <div style={{ fontSize: 15, fontWeight: 600, color: item.paid ? "#565f89" : "#c0caf5", textDecoration: item.paid ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tag(item)}</div>
+                                        <div style={{ fontSize: 15, fontWeight: 800, color: item.paid ? "#565f89" : (item.discount ? "#f7768e" : "#fff"), textDecoration: item.paid ? "line-through" : "none", flexShrink: 0, paddingLeft: 10 }}>{item.discount ? "-" : ""}{won(item.amount)}</div>
+                                    </div>
+                                </label>
+                            ))}
 
-                            {/* 누적 입금 + 남은 잔액 */}
-                            {totalPayments > 0 && (
+                            {/* 이번 달 입금 내역 */}
+                            {currentPayments > 0 && (
                                 <div style={{ marginTop: 16, background: "rgba(0,0,0,0.2)", borderRadius: 12, padding: "14px 16px" }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                                        <span style={{ fontSize: 13, color: "#9ece6a", fontWeight: 700 }}>누적 입금</span>
-                                        <span style={{ fontSize: 15, fontWeight: 800, color: "#9ece6a" }}>{won(totalPayments)}</span>
+                                        <span style={{ fontSize: 13, color: "#9ece6a", fontWeight: 700 }}>이번 달 입금</span>
+                                        <span style={{ fontSize: 15, fontWeight: 800, color: "#9ece6a" }}>{won(currentPayments)}</span>
                                     </div>
                                     {remaining > 0 && (
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
