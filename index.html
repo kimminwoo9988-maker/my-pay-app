@@ -895,8 +895,13 @@
 
                 const currentTotal = currentItems.reduce((s, e) => s + amt(e), 0);
                 const currentUnpaidTotal = currentItems.filter(e => !e.paid).reduce((s, e) => s + amt(e), 0);
+                const currentAllPaid = currentItems.length > 0 && currentItems.every(e => e.paid);
                 const totalBilled = currentTotal + Math.max(0, carryover);
-                const remaining = Math.max(0, carryover) + currentUnpaidTotal - currentPayments + Math.min(0, carryover);
+                
+                // 모든 항목이 수동 체크 완료면 remaining = 0 (입금 기록과 무관)
+                const allManuallySettled = (pastItems.length === 0 || allPastSettled) && (currentItems.length === 0 || currentAllPaid);
+                const rawRemaining = Math.max(0, carryover) + currentUnpaidTotal - currentPayments + Math.min(0, carryover);
+                const remaining = allManuallySettled ? 0 : rawRemaining;
                 
                 // 작업도 없고 이월도 없고 입금도 없으면 미표시 (선지급은 표시)
                 if (currentItems.length === 0 && carryover === 0 && currentPayments === 0) return null;
